@@ -1,9 +1,10 @@
-package main
+package agent
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"log/slog"
@@ -17,22 +18,21 @@ import (
 	// containerd "github.com/containerd/containerd/v2/client"
 	// "github.com/containerd/containerd/v2/pkg/namespaces"
 
+	"github.com/davecgh/go-spew/spew"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/oauth2"
 
 	"github.com/spf13/viper"
 )
 
 const (
-	EnvPrefix   = "RERUN_AGENT"
-	LogLevelKey = "log-level"
 	devClientID = "xJv0jqeP7QdPOsUidorgDlj4Mi74gVEW"
 	audience    = "https://api.resim.ai"
 )
-
-const ConfigPath = "$HOME/resim"
-const CredentialCacheFilename = "cache.json"
 
 type tokenJSON struct {
 	AccessToken  string `json:"access_token"`
@@ -50,51 +50,60 @@ type CredentialCache struct {
 type Agent struct {
 	DockerClient *client.Client
 	Token        oauth2.Token
+	AuthHost     string
+	ApiHost      string
 }
 
-func main() {
-	agent := Agent{}
+type Job struct {
+	TaskName             string
+	WorkerImageURI       string
+	EnvironmentVariables []string
+	Tags                 [][]string
+}
 
-	agent.initialize()
+type JobResponse struct {
+	WorkerImageURI       string     `json:"workerImageURI"`
+	EnvironmentVariables [][]string `json:"environmentVariables"`
+	Tags                 [][]string `json:"tags"`
+	TaskName             string     `json:"taskName"`
+}
+
+func Start(agent Agent) {
+	err := agent.loadConfig()
+	if err != nil {
+		log.Fatal("error loading config", err)
+	}
+
+	err = agent.initializeDockerClient()
+	if err != nil {
+		log.Fatal("error initializing Docker client", err)
+	}
 	defer agent.DockerClient.Close()
 
-	agent.getWorkerImage()
+	cache := loadCredentialCache()
+	agent.Token = agent.authenticate(&cache)
+	saveCredentialCache(&cache)
+
+	ctx := context.Background()
+
+	for {
+		job := agent.getJob()
+		agent.pullImage(ctx, job.WorkerImageURI)
+		// agent.pullImage(ctx, job.CustomerImageURI)
+		customerContainerID := agent.createCustomerContainer(job)
+		fmt.Println(customerContainerID)
+		time.Sleep(5 * time.Second)
+	}
 }
 
-func (a *Agent) initialize() {
-	viper.SetEnvPrefix(EnvPrefix)
-	viper.AutomaticEnv()
-	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
-
-	viper.SetDefault(LogLevelKey, "0") // info, default
-	// TODO: work out how to convert strings into level numbers
-	slog.SetLogLoggerLevel(slog.LevelDebug)
-
+func (a *Agent) initializeDockerClient() error {
 	var err error
 	a.DockerClient, err = client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	var cache CredentialCache
-	err = cache.loadCredentialCache()
-	if err != nil {
-		log.Println("Initializing credential cache")
-	}
-	defer cache.SaveCredentialCache()
-
-	a.Token = a.authenticate(&cache)
-}
-
-func (a Agent) getWorkerImage() {
-	ctx := context.Background()
-
-	targetImage := "docker.io/library/nginx:latest"
-
-	err := a.pullImage(ctx, targetImage)
-	if err != nil {
-		log.Fatal(err)
-	}
+	return nil
 }
 
 func (a Agent) pullImage(ctx context.Context, targetImage string) error {
@@ -167,19 +176,20 @@ func (a Agent) authenticate(cache *CredentialCache) oauth2.Token {
 	return token
 }
 
-func (c *CredentialCache) loadCredentialCache() error {
+func loadCredentialCache() CredentialCache {
 	homedir, _ := os.UserHomeDir()
 	path := strings.ReplaceAll(filepath.Join(ConfigPath, CredentialCacheFilename), "$HOME", homedir)
+	var c CredentialCache
+	c.Tokens = map[string]oauth2.Token{}
 	data, err := os.ReadFile(path)
-	if err != nil {
-		c.Tokens = map[string]oauth2.Token{}
-		return err
+	if err == nil {
+		json.Unmarshal(data, &c.Tokens)
 	}
 
-	return json.Unmarshal(data, &c.Tokens)
+	return c
 }
 
-func (c *CredentialCache) SaveCredentialCache() {
+func saveCredentialCache(c *CredentialCache) {
 	token, err := c.TokenSource.Token()
 	if err != nil {
 		log.Println("error getting token:", err)
@@ -217,4 +227,71 @@ func GetConfigDir() (string, error) {
 		}
 	}
 	return expectedDir, nil
+}
+
+func (a Agent) getJob() Job {
+	url := fmt.Sprintf("%v/task/poll", a.ApiHost)
+	jsonBody := []byte(`{"workerID": "big-yin", "poolLabels": ["small-hil"]}`)
+	// jsonBody := []byte(`{"workerID": "big-yin", "poolLabels": ["small-hil", "big-hil"]}`) // example of no content
+	bodyReader := bytes.NewReader(jsonBody)
+
+	req, _ := http.NewRequest(http.MethodPost, url, bodyReader)
+
+	req.Header.Add("authorization", fmt.Sprintf("Bearer %v", a.Token.AccessToken))
+	req.Header.Set("Content-Type", "application/json")
+
+	res, _ := http.DefaultClient.Do(req)
+
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+
+	fmt.Println("body is", string(body))
+
+	var jobResponse JobResponse
+	err := json.Unmarshal(body, &jobResponse)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	spew.Dump(jobResponse)
+
+	job := Job{
+		EnvironmentVariables: stringifyEnvironmentVariables(jobResponse.EnvironmentVariables),
+		WorkerImageURI:       jobResponse.WorkerImageURI,
+		Tags:                 jobResponse.Tags,
+		TaskName:             jobResponse.TaskName,
+	}
+
+	spew.Dump(job)
+	return job
+}
+
+func (a Agent) createCustomerContainer(job Job) string {
+	config := &container.Config{
+		Image: job.WorkerImageURI,
+		// Cmd:   []string{"echo", "hello world"},
+		Env: job.EnvironmentVariables,
+	}
+	res, err := a.DockerClient.ContainerCreate(
+		context.TODO(),
+		config,
+		&container.HostConfig{},
+		&network.NetworkingConfig{},
+		&v1.Platform{},
+		job.TaskName,
+	)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	return res.ID
+}
+
+func stringifyEnvironmentVariables(inputVars [][]string) []string {
+	var envVars []string
+	for _, envVar := range inputVars {
+		envVarString := strings.Join(envVar, "=")
+		envVars = append(envVars, envVarString)
+	}
+	return envVars
 }
