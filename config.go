@@ -27,6 +27,7 @@ const (
 func (a *Agent) loadConfig() error {
 	viper.SetConfigName("config")   // name of config file (without extension)
 	viper.SetConfigType("yaml")     // REQUIRED if the config file does not have the extension in the name
+	viper.AddConfigPath("/tmp")     // used for testing
 	viper.AddConfigPath(ConfigPath) // call multiple times to add many search paths
 	err := viper.ReadInConfig()     // Find and read the config file
 	if err != nil {                 // Handle errors reading the config file

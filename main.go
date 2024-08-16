@@ -375,8 +375,7 @@ func (a Agent) startHeartbeat() error {
 func getCustomerImageURI(envVars [][]string) string {
 	for _, envVar := range envVars {
 		if envVar[0] == "RERUN_WORKER_BUILD_IMAGE_URI" {
-			// return envVar[1]
-			return "public.ecr.aws/docker/library/hello-world:latest"
+			return envVar[1]
 		}
 	}
 	return ""
