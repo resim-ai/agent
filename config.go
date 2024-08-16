@@ -2,6 +2,7 @@ package agent
 
 import (
 	"fmt"
+	"log"
 	"log/slog"
 	"strings"
 
@@ -13,6 +14,10 @@ const (
 	ApiHostKey              = "api-host"
 	AuthHostDefault         = "https://resim.us.auth0.com"
 	AuthHostKey             = "auth-host"
+	PoolLabelsKey           = "pool-labels"
+	UsernameKey             = "username"
+	PasswordKey             = "password"
+	AgentNameKey            = "name"
 	EnvPrefix               = "RERUN_AGENT"
 	LogLevelKey             = "log-level"
 	ConfigPath              = "$HOME/resim"
@@ -42,9 +47,21 @@ func (a *Agent) loadConfig() error {
 	a.ApiHost = viper.GetString(ApiHostKey)
 	a.AuthHost = viper.GetString(AuthHostKey)
 
+	if !viper.IsSet(AgentNameKey) {
+		log.Fatal("Agent name must be set")
+	}
+	a.Name = viper.GetString(AgentNameKey)
+
+	if !viper.IsSet(PoolLabelsKey) {
+		log.Fatal("Pool labels must be set")
+	}
+	a.PoolLabels = viper.GetStringSlice(PoolLabelsKey)
+
 	slog.Info("loaded config",
 		"apiHost", a.ApiHost,
 		"authHost", a.AuthHost,
+		"name", a.Name,
+		"poolLabels", a.PoolLabels,
 	)
 
 	return nil

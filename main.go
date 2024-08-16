@@ -18,9 +18,9 @@ import (
 	// containerd "github.com/containerd/containerd/v2/client"
 	// "github.com/containerd/containerd/v2/pkg/namespaces"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -52,11 +52,14 @@ type Agent struct {
 	Token        oauth2.Token
 	AuthHost     string
 	ApiHost      string
+	Name         string
+	PoolLabels   []string
 }
 
 type Job struct {
 	TaskName             string
 	WorkerImageURI       string
+	CustomerImageURI     string
 	EnvironmentVariables []string
 	Tags                 [][]string
 }
@@ -67,6 +70,10 @@ type JobResponse struct {
 	Tags                 [][]string `json:"tags"`
 	TaskName             string     `json:"taskName"`
 }
+
+// TODO
+// set up volumes
+// upload outputs
 
 func Start(agent Agent) {
 	err := agent.loadConfig()
@@ -84,15 +91,24 @@ func Start(agent Agent) {
 	agent.Token = agent.authenticate(&cache)
 	saveCredentialCache(&cache)
 
+	agent.startHeartbeat()
+
 	ctx := context.Background()
 
 	for {
 		job := agent.getJob()
 		agent.pullImage(ctx, job.WorkerImageURI)
+		agent.pullImage(ctx, job.CustomerImageURI)
+
+		// loop through env vars and find RERUN_WORKER_BUILD_IMAGE_URI
 		// agent.pullImage(ctx, job.CustomerImageURI)
+
 		customerContainerID := agent.createCustomerContainer(job)
-		fmt.Println(customerContainerID)
-		time.Sleep(5 * time.Second)
+		err := agent.runCustomerContainer(ctx, customerContainerID)
+		if err != nil {
+			log.Fatal(err)
+		}
+		time.Sleep(5000 * time.Second)
 	}
 }
 
@@ -129,8 +145,8 @@ func (a Agent) authenticate(cache *CredentialCache) oauth2.Token {
 	// TODO dev/prod logic
 	clientID := devClientID
 	tokenURL := "https://resim-dev.us.auth0.com/oauth/token"
-	username := viper.GetString("username")
-	password := viper.GetString("password")
+	username := viper.GetString(UsernameKey)
+	password := viper.GetString(PasswordKey)
 
 	cache.ClientID = clientID
 
@@ -245,15 +261,11 @@ func (a Agent) getJob() Job {
 	defer res.Body.Close()
 	body, _ := io.ReadAll(res.Body)
 
-	fmt.Println("body is", string(body))
-
 	var jobResponse JobResponse
 	err := json.Unmarshal(body, &jobResponse)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	spew.Dump(jobResponse)
 
 	job := Job{
 		EnvironmentVariables: stringifyEnvironmentVariables(jobResponse.EnvironmentVariables),
@@ -261,8 +273,8 @@ func (a Agent) getJob() Job {
 		Tags:                 jobResponse.Tags,
 		TaskName:             jobResponse.TaskName,
 	}
+	job.CustomerImageURI = getCustomerImageURI(jobResponse.EnvironmentVariables)
 
-	spew.Dump(job)
 	return job
 }
 
@@ -275,7 +287,20 @@ func (a Agent) createCustomerContainer(job Job) string {
 	res, err := a.DockerClient.ContainerCreate(
 		context.TODO(),
 		config,
-		&container.HostConfig{},
+		&container.HostConfig{
+			Mounts: []mount.Mount{
+				{
+					Type:   mount.TypeBind,
+					Source: "/var/run/docker.sock",
+					Target: "/var/run/docker.sock",
+				},
+				{
+					Type:   mount.TypeBind,
+					Source: "/tmp/resim",
+					Target: "/tmp/resim",
+				},
+			},
+		},
 		&network.NetworkingConfig{},
 		&v1.Platform{},
 		job.TaskName,
@@ -291,7 +316,68 @@ func stringifyEnvironmentVariables(inputVars [][]string) []string {
 	var envVars []string
 	for _, envVar := range inputVars {
 		envVarString := strings.Join(envVar, "=")
+
+		if envVar[0] == "RERUN_WORKER_AUTH_TOKEN" {
+			envVarString = fmt.Sprintf("%v={\"access_token\":\"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IlU5cm5vRXhFWV9PSi1pT1lncmg5TiJ9.eyJodHRwczovL2FwaS5yZXNpbS5haS9vcmdfaWQiOiJlMmUucmVzaW0uYWkiLCJodHRwczovL2FwaS5yZXNpbS5haS9lbWFpbCI6IndvcmtlcitlMmUucmVzaW0uYWlAcmVzaW0uYWkiLCJodHRwczovL2FwaS5yZXNpbS5haS93b3JrZXJfdHlwZSI6InVuaXZlcnNhbCIsImlzcyI6Imh0dHBzOi8vcmVzaW0tZGV2LnVzLmF1dGgwLmNvbS8iLCJzdWIiOiJjN2lOUGh0clJ0OTR5R3VkWVA1ZlZSbzh1M2RqTEVPOEBjbGllbnRzIiwiYXVkIjoiaHR0cHM6Ly9hcGkucmVzaW0uYWkiLCJpYXQiOjE3MjM3MzY2NTIsImV4cCI6MTcyMzgyMzA1Miwic2NvcGUiOiJ3b3JrZXIgZXhwZXJpZW5jZXM6cmVhZCBleHBlcmllbmNlczp3cml0ZSBleHBlcmllbmNlVGFnczpyZWFkIGV4cGVyaWVuY2VUYWdzOndyaXRlIHByb2plY3RzOnJlYWQgcHJvamVjdHM6d3JpdGUgYmF0Y2hlczpyZWFkIGJhdGNoZXM6d3JpdGUgYnVpbGRzOnJlYWQgYnVpbGRzOndyaXRlIHZpZXc6cmVhZCB2aWV3OndyaXRlIHN5c3RlbXM6cmVhZCBzeXN0ZW1zOndyaXRlIHN3ZWVwczpyZWFkIHN3ZWVwczp3cml0ZSByZXBvcnRzOnJlYWQgcmVwb3J0czp3cml0ZSIsImd0eSI6ImNsaWVudC1jcmVkZW50aWFscyIsImF6cCI6ImM3aU5QaHRyUnQ5NHlHdWRZUDVmVlJvOHUzZGpMRU84IiwicGVybWlzc2lvbnMiOlsid29ya2VyIiwiZXhwZXJpZW5jZXM6cmVhZCIsImV4cGVyaWVuY2VzOndyaXRlIiwiZXhwZXJpZW5jZVRhZ3M6cmVhZCIsImV4cGVyaWVuY2VUYWdzOndyaXRlIiwicHJvamVjdHM6cmVhZCIsInByb2plY3RzOndyaXRlIiwiYmF0Y2hlczpyZWFkIiwiYmF0Y2hlczp3cml0ZSIsImJ1aWxkczpyZWFkIiwiYnVpbGRzOndyaXRlIiwidmlldzpyZWFkIiwidmlldzp3cml0ZSIsInN5c3RlbXM6cmVhZCIsInN5c3RlbXM6d3JpdGUiLCJzd2VlcHM6cmVhZCIsInN3ZWVwczp3cml0ZSIsInJlcG9ydHM6cmVhZCIsInJlcG9ydHM6d3JpdGUiXX0.ZAydfqgKNnHbC0KbyQh1gHwQrtRM9v794QslK1pfwGNWAgdZuTKkpKaYFdEClSdU3R5hwo16GVMqXB4BRIcPc09AU2fcX0qk5oGGdFucIuSBG50GMnCBCGWtWx9Jnl7FCqHoncsJEjf-b-E2Y35anIJDcyjN0j2_3szQW7-dDp4v7Q9J8nSl2YdW-zxG3FscYkLeAzCwJf_ESHpCFtKCmsw1fo6V_SCJojiU4EfFf2tDCMiyBpsIFHI5vHe7i68GIicGDGa6KDTcdNJY2ky58blL4Ie0tEbKMqol8tgqoyCdG3Zb48pU9ZG_S-C5FJ8R-Vr_ThFnjQT6LoCbbUV1LA\",\"token_type\":\"Bearer\",\"expiry\":\"2024-08-16T15:44:12.41592629Z\"}", envVar[0])
+		}
+		if envVar[0] == "RERUN_WORKER_BUILD_IMAGE_URI" {
+			envVarString = fmt.Sprintf("%v=public.ecr.aws/docker/library/hello-world:latest", envVar[0])
+		}
 		envVars = append(envVars, envVarString)
 	}
 	return envVars
+}
+
+func (a Agent) runCustomerContainer(ctx context.Context, containerID string) error {
+	err := a.DockerClient.ContainerStart(ctx, containerID, container.StartOptions{})
+	if err != nil {
+		return err
+	}
+	slog.Info("container started")
+	for {
+		status, err := a.DockerClient.ContainerInspect(ctx, containerID)
+		if err != nil {
+			return err
+		}
+		if status.State.Status != "running" {
+			slog.Info("container is not running")
+			break
+		} else {
+			slog.Info("container is running")
+		}
+		time.Sleep(2 * time.Second)
+	}
+	return nil
+}
+
+func (a Agent) startHeartbeat() error {
+	ticker := time.NewTicker(30 * time.Second)
+
+	url := fmt.Sprintf("%v/agent/heartbeat", a.ApiHost)
+
+	go func() {
+		for range ticker.C {
+			jsonBody := []byte(`{"agentName": "%v", "poolLabels": ["small-hil"]}`)
+			bodyReader := bytes.NewReader(jsonBody)
+
+			hb, _ := http.NewRequest(http.MethodPost, url, bodyReader)
+
+			hb.Header.Add("authorization", fmt.Sprintf("Bearer %v", a.Token.AccessToken))
+			hb.Header.Set("Content-Type", "application/json")
+			res, _ := http.DefaultClient.Do(hb)
+			fmt.Println(res.Status)
+		}
+	}()
+
+	return nil
+}
+
+func getCustomerImageURI(envVars [][]string) string {
+	for _, envVar := range envVars {
+		if envVar[0] == "RERUN_WORKER_BUILD_IMAGE_URI" {
+			// return envVar[1]
+			return "public.ecr.aws/docker/library/hello-world:latest"
+		}
+	}
+	return ""
 }
