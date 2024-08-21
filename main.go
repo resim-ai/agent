@@ -9,14 +9,9 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
-
-	// containerd "github.com/containerd/containerd/v2/client"
-	// "github.com/containerd/containerd/v2/pkg/namespaces"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
@@ -25,35 +20,17 @@ import (
 	"github.com/docker/docker/client"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/oauth2"
-
-	"github.com/spf13/viper"
 )
-
-const (
-	devClientID = "xJv0jqeP7QdPOsUidorgDlj4Mi74gVEW"
-	audience    = "https://api.resim.ai"
-)
-
-type tokenJSON struct {
-	AccessToken  string `json:"access_token"`
-	TokenType    string `json:"token_type"`
-	RefreshToken string `json:"refresh_token"`
-	ExpiresIn    int32  `json:"expires_in"`
-}
-
-type CredentialCache struct {
-	Tokens      map[string]oauth2.Token `json:"tokens"`
-	TokenSource oauth2.TokenSource
-	ClientID    string
-}
 
 type Agent struct {
-	DockerClient *client.Client
-	Token        oauth2.Token
-	AuthHost     string
-	ApiHost      string
-	Name         string
-	PoolLabels   []string
+	DockerClient       *client.Client
+	Token              oauth2.Token
+	ClientID           string
+	AuthHost           string
+	ApiHost            string
+	Name               string
+	PoolLabels         []string
+	ConfigFileOverride string
 }
 
 type Job struct {
@@ -87,28 +64,31 @@ func Start(agent Agent) {
 	}
 	defer agent.DockerClient.Close()
 
-	cache := loadCredentialCache()
-	agent.Token = agent.authenticate(&cache)
-	saveCredentialCache(&cache)
+	err = agent.checkAuth()
+	if err != nil {
+		log.Fatal("error in authentication")
+	}
 
 	agent.startHeartbeat()
 
-	ctx := context.Background()
+	// ctx := context.Background()
 
 	for {
-		job := agent.getJob()
-		agent.pullImage(ctx, job.WorkerImageURI)
-		agent.pullImage(ctx, job.CustomerImageURI)
+		agent.checkAuth()
 
-		// loop through env vars and find RERUN_WORKER_BUILD_IMAGE_URI
+		// job := agent.getJob()
+		// agent.pullImage(ctx, job.WorkerImageURI)
 		// agent.pullImage(ctx, job.CustomerImageURI)
 
-		customerContainerID := agent.createCustomerContainer(job)
-		err := agent.runCustomerContainer(ctx, customerContainerID)
-		if err != nil {
-			log.Fatal(err)
-		}
-		time.Sleep(5000 * time.Second)
+		// // loop through env vars and find RERUN_WORKER_BUILD_IMAGE_URI
+		// // agent.pullImage(ctx, job.CustomerImageURI)
+
+		// customerContainerID := agent.createCustomerContainer(job)
+		// err := agent.runCustomerContainer(ctx, customerContainerID)
+		// if err != nil {
+		// 	log.Fatal(err)
+		// }
+		time.Sleep(50 * time.Second)
 	}
 }
 
@@ -136,100 +116,6 @@ func (a Agent) pullImage(ctx context.Context, targetImage string) error {
 	slog.Info("Pulled image", "image", targetImage)
 
 	return nil
-}
-
-func (a Agent) authenticate(cache *CredentialCache) oauth2.Token {
-	var token oauth2.Token
-	var tokenSource oauth2.TokenSource
-
-	// TODO dev/prod logic
-	clientID := devClientID
-	tokenURL := "https://resim-dev.us.auth0.com/oauth/token"
-	username := viper.GetString(UsernameKey)
-	password := viper.GetString(PasswordKey)
-
-	cache.ClientID = clientID
-
-	token, ok := cache.Tokens[clientID]
-	if !(ok && token.Valid()) {
-
-		payloadVals := url.Values{
-			"grant_type": []string{"http://auth0.com/oauth/grant-type/password-realm"},
-			"realm":      []string{"agents"},
-			"username":   []string{username},
-			"password":   []string{password},
-			"audience":   []string{audience},
-			"client_id":  []string{clientID},
-		}
-
-		req, _ := http.NewRequest("POST", tokenURL, strings.NewReader(payloadVals.Encode()))
-
-		req.Header.Add("content-type", "application/x-www-form-urlencoded")
-
-		res, err := http.DefaultClient.Do(req)
-		if err != nil {
-			log.Fatal("error in password auth: ", err)
-		}
-
-		defer res.Body.Close()
-		body, _ := io.ReadAll(res.Body)
-
-		var tj tokenJSON
-		err = json.Unmarshal(body, &tj)
-		if err != nil {
-			log.Fatal(err)
-		}
-		token = oauth2.Token{
-			AccessToken:  tj.AccessToken,
-			TokenType:    tj.TokenType,
-			RefreshToken: tj.RefreshToken,
-			Expiry:       time.Now().Add(time.Duration(tj.ExpiresIn) * time.Second),
-		}
-	}
-
-	cache.TokenSource = oauth2.ReuseTokenSource(&token, tokenSource)
-
-	return token
-}
-
-func loadCredentialCache() CredentialCache {
-	homedir, _ := os.UserHomeDir()
-	path := strings.ReplaceAll(filepath.Join(ConfigPath, CredentialCacheFilename), "$HOME", homedir)
-	var c CredentialCache
-	c.Tokens = map[string]oauth2.Token{}
-	data, err := os.ReadFile(path)
-	if err == nil {
-		json.Unmarshal(data, &c.Tokens)
-	}
-
-	return c
-}
-
-func saveCredentialCache(c *CredentialCache) {
-	token, err := c.TokenSource.Token()
-	if err != nil {
-		log.Println("error getting token:", err)
-	}
-	if token != nil {
-		c.Tokens[c.ClientID] = *token
-	}
-
-	data, err := json.Marshal(c.Tokens)
-	if err != nil {
-		log.Println("error marshaling credential cache:", err)
-		return
-	}
-
-	expectedDir, err := GetConfigDir()
-	if err != nil {
-		return
-	}
-
-	path := filepath.Join(expectedDir, CredentialCacheFilename)
-	err = os.WriteFile(path, data, 0600)
-	if err != nil {
-		log.Println("error saving credential cache:", err)
-	}
 }
 
 func GetConfigDir() (string, error) {
@@ -364,8 +250,10 @@ func (a Agent) startHeartbeat() error {
 
 			hb.Header.Add("authorization", fmt.Sprintf("Bearer %v", a.Token.AccessToken))
 			hb.Header.Set("Content-Type", "application/json")
-			res, _ := http.DefaultClient.Do(hb)
-			fmt.Println(res.Status)
+			_, err := http.DefaultClient.Do(hb)
+			if err != nil {
+				slog.Error("error in heartbeat")
+			}
 		}
 	}()
 

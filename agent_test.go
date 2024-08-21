@@ -65,19 +65,19 @@ func (s *AgentTestSuite) TestLoadConfigFile() {
 	}
 	defer os.Remove(f.Name())
 
-	testConfig := `
-api-host: https://api.resim.ai/worker/v1
+	testConfig := `api-host: https://api.resim.ai/worker/v1
 name: my-forklift
 pool-labels: 
   - small
   - big
 username: gimli
-password: hunter2
-	`
+password: hunter2`
 
 	f.WriteString(testConfig)
 
-	a := Agent{}
+	a := Agent{
+		ConfigFileOverride: f.Name(),
+	}
 	a.loadConfig()
 
 	s.Equal("https://api.resim.ai/worker/v1", a.ApiHost)
