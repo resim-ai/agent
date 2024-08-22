@@ -236,18 +236,19 @@ func (a Agent) runCustomerContainer(ctx context.Context, containerID string) err
 	return nil
 }
 
-func (a Agent) startHeartbeat() error {
+func (a *Agent) startHeartbeat() error {
 	ticker := time.NewTicker(30 * time.Second)
 
 	url := fmt.Sprintf("%v/agent/heartbeat", a.ApiHost)
 
 	go func() {
 		for range ticker.C {
+			a.checkAuth()
+
 			jsonBody := []byte(`{"agentName": "%v", "poolLabels": ["small-hil"]}`)
 			bodyReader := bytes.NewReader(jsonBody)
 
 			hb, _ := http.NewRequest(http.MethodPost, url, bodyReader)
-
 			hb.Header.Add("authorization", fmt.Sprintf("Bearer %v", a.Token.AccessToken))
 			hb.Header.Set("Content-Type", "application/json")
 			_, err := http.DefaultClient.Do(hb)
