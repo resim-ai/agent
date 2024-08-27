@@ -32,7 +32,7 @@ type tokenJSON struct {
 func (a *Agent) checkAuth() error {
 	a.loadCredentialCache()
 
-	if time.Now().After(a.Token.Expiry) && a.Token.RefreshToken != "" {
+	if time.Now().After(a.Token.Expiry.Add(-10*time.Second)) && a.Token.RefreshToken != "" {
 		a.authenticate("refresh")
 		a.saveCredentialCache()
 	} else if !(a.Token.Valid()) {
