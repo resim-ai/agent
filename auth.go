@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -22,6 +21,13 @@ const (
 	audience    = "https://api.resim.ai"
 )
 
+type AuthMode string
+
+const (
+	authModePassword AuthMode = "password"
+	authModeRefresh  AuthMode = "refresh"
+)
+
 type tokenJSON struct {
 	AccessToken  string `json:"access_token"`
 	TokenType    string `json:"token_type"`
@@ -33,17 +39,17 @@ func (a *Agent) checkAuth() error {
 	a.loadCredentialCache()
 
 	if time.Now().After(a.Token.Expiry.Add(-10*time.Second)) && a.Token.RefreshToken != "" {
-		a.authenticate("refresh")
+		a.authenticate(authModeRefresh)
 		a.saveCredentialCache()
 	} else if !(a.Token.Valid()) {
-		a.authenticate("password")
+		a.authenticate(authModePassword)
 		a.saveCredentialCache()
 	}
 
 	return nil
 }
 
-func (a *Agent) authenticate(mode string) {
+func (a *Agent) authenticate(mode AuthMode) {
 
 	tokenURL := fmt.Sprintf("%v/oauth/token", a.AuthHost)
 	username := viper.GetString(UsernameKey)
@@ -52,9 +58,7 @@ func (a *Agent) authenticate(mode string) {
 
 	switch mode {
 
-	case "password":
-		slog.Info("using password")
-
+	case authModePassword:
 		payloadVals = url.Values{
 			"grant_type": []string{"http://auth0.com/oauth/grant-type/password-realm"},
 			"realm":      []string{"agents"},
@@ -64,9 +68,7 @@ func (a *Agent) authenticate(mode string) {
 			"client_id":  []string{a.ClientID},
 			"scope":      []string{"offline_access"},
 		}
-	case "refresh":
-		slog.Info("using refresh token")
-
+	case authModeRefresh:
 		payloadVals = url.Values{
 			"grant_type":    []string{"refresh_token"},
 			"client_id":     []string{a.ClientID},

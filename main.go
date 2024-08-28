@@ -33,19 +33,19 @@ type Agent struct {
 	ConfigFileOverride string
 }
 
-type Job struct {
-	TaskName             string
+type Task struct {
+	Name                 string
 	WorkerImageURI       string
 	CustomerImageURI     string
 	EnvironmentVariables []string
 	Tags                 [][]string
 }
 
-type JobResponse struct {
+type TaskResponse struct {
+	Name                 string     `json:"taskName"`
 	WorkerImageURI       string     `json:"workerImageURI"`
 	EnvironmentVariables [][]string `json:"environmentVariables"`
 	Tags                 [][]string `json:"tags"`
-	TaskName             string     `json:"taskName"`
 }
 
 // TODO
@@ -76,14 +76,11 @@ func Start(agent Agent) {
 	for {
 		agent.checkAuth()
 
-		job := agent.getJob()
-		agent.pullImage(ctx, job.WorkerImageURI)
-		agent.pullImage(ctx, job.CustomerImageURI)
+		task := agent.getTask()
+		agent.pullImage(ctx, task.WorkerImageURI)
+		agent.pullImage(ctx, task.CustomerImageURI)
 
-		// loop through env vars and find RERUN_WORKER_BUILD_IMAGE_URI
-		// agent.pullImage(ctx, job.CustomerImageURI)
-
-		customerContainerID := agent.createCustomerContainer(job)
+		customerContainerID := agent.createCustomerContainer(task)
 		err := agent.runCustomerContainer(ctx, customerContainerID)
 		if err != nil {
 			log.Fatal(err)
@@ -131,7 +128,7 @@ func GetConfigDir() (string, error) {
 	return expectedDir, nil
 }
 
-func (a Agent) getJob() Job {
+func (a Agent) getTask() Task {
 	url := fmt.Sprintf("%v/task/poll", a.ApiHost)
 	jsonBody := []byte(`{"workerID": "big-yin", "poolLabels": ["small-hil"]}`)
 	// jsonBody := []byte(`{"workerID": "big-yin", "poolLabels": ["small-hil", "big-hil"]}`) // example of no content
@@ -142,33 +139,35 @@ func (a Agent) getJob() Job {
 	req.Header.Add("authorization", fmt.Sprintf("Bearer %v", a.Token.AccessToken))
 	req.Header.Set("Content-Type", "application/json")
 
-	res, _ := http.DefaultClient.Do(req)
-
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
 	defer res.Body.Close()
 	body, _ := io.ReadAll(res.Body)
 
-	var jobResponse JobResponse
-	err := json.Unmarshal(body, &jobResponse)
+	var taskResponse TaskResponse
+	err = json.Unmarshal(body, &taskResponse)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	job := Job{
-		EnvironmentVariables: stringifyEnvironmentVariables(jobResponse.EnvironmentVariables),
-		WorkerImageURI:       jobResponse.WorkerImageURI,
-		Tags:                 jobResponse.Tags,
-		TaskName:             jobResponse.TaskName,
+	task := Task{
+		EnvironmentVariables: stringifyEnvironmentVariables(taskResponse.EnvironmentVariables),
+		WorkerImageURI:       taskResponse.WorkerImageURI,
+		Tags:                 taskResponse.Tags,
+		Name:                 taskResponse.Name,
 	}
-	job.CustomerImageURI = getCustomerImageURI(jobResponse.EnvironmentVariables)
+	task.CustomerImageURI = getCustomerImageURI(taskResponse.EnvironmentVariables)
 
-	return job
+	return task
 }
 
-func (a Agent) createCustomerContainer(job Job) string {
+func (a Agent) createCustomerContainer(task Task) string {
 	config := &container.Config{
-		Image: job.WorkerImageURI,
+		Image: task.WorkerImageURI,
 		// Cmd:   []string{"echo", "hello world"},
-		Env: job.EnvironmentVariables,
+		Env: task.EnvironmentVariables,
 	}
 	res, err := a.DockerClient.ContainerCreate(
 		context.TODO(),
@@ -189,7 +188,7 @@ func (a Agent) createCustomerContainer(job Job) string {
 		},
 		&network.NetworkingConfig{},
 		&v1.Platform{},
-		job.TaskName,
+		task.Name,
 	)
 	if err != nil {
 		fmt.Println(err)
