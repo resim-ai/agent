@@ -21,6 +21,29 @@ import (
 	"golang.org/x/oauth2"
 )
 
+type agentStatus string
+
+const (
+	agentStatusIdle     agentStatus = "IDLE"
+	agentStatusStarting agentStatus = "STARTING"
+	agentStatusRunning  agentStatus = "RUNNING"
+	agentStatusError    agentStatus = "ERROR"
+)
+
+type taskStatus string
+
+const (
+	taskStatusRunning   taskStatus = "RUNNING"
+	taskStatusStarting  taskStatus = "STARTING"
+	taskStatusError     taskStatus = "ERROR"
+	taskStatusSucceeded taskStatus = "SUCCEEDED"
+)
+
+type taskStatusMessage struct {
+	Name   string
+	Status taskStatus
+}
+
 type Agent struct {
 	DockerClient       *client.Client
 	Token              oauth2.Token
@@ -30,6 +53,7 @@ type Agent struct {
 	Name               string
 	PoolLabels         []string
 	ConfigFileOverride string
+	Status             agentStatus
 }
 
 type Task struct {
@@ -68,6 +92,22 @@ func Start(agent Agent) {
 		log.Fatal("error in authentication")
 	}
 
+	agentStateChan := make(chan agentStatus)
+	taskStateChan := make(chan taskStatusMessage)
+
+	go func() {
+		for {
+			select {
+			case taskStatusMessage := <-taskStateChan:
+				agent.updateTaskStatus(taskStatusMessage.Name, taskStatusMessage.Status)
+			case agentStatus := <-agentStateChan:
+				agent.Status = agentStatus
+			}
+		}
+	}()
+
+	agentStateChan <- agentStatusIdle
+
 	agent.startHeartbeat()
 
 	ctx := context.Background()
@@ -76,14 +116,20 @@ func Start(agent Agent) {
 		agent.checkAuth()
 
 		task := agent.getTask()
+		taskStateChan <- taskStatusMessage{
+			Name:   task.Name,
+			Status: taskStatusStarting,
+		}
+		agentStateChan <- agentStatusRunning
 		agent.pullImage(ctx, task.WorkerImageURI)
 		agent.pullImage(ctx, task.CustomerImageURI)
 
 		customerContainerID := agent.createCustomerContainer(task)
-		err := agent.runCustomerContainer(ctx, customerContainerID)
+		err := agent.runCustomerContainer(ctx, customerContainerID, task.Name, taskStateChan)
 		if err != nil {
 			log.Fatal(err)
 		}
+		agentStateChan <- agentStatusIdle
 		time.Sleep(50 * time.Second)
 	}
 }
@@ -210,12 +256,16 @@ func stringifyEnvironmentVariables(inputVars map[string]string) []string {
 	return envVars
 }
 
-func (a Agent) runCustomerContainer(ctx context.Context, containerID string) error {
+func (a Agent) runCustomerContainer(ctx context.Context, containerID string, taskName string, taskStateChan chan taskStatusMessage) error {
 	err := a.DockerClient.ContainerStart(ctx, containerID, container.StartOptions{})
 	if err != nil {
 		return err
 	}
 	slog.Info("container started")
+	taskStateChan <- taskStatusMessage{
+		Name:   taskName,
+		Status: taskStatusRunning,
+	}
 	for {
 		status, err := a.DockerClient.ContainerInspect(ctx, containerID)
 		if err != nil {
@@ -223,6 +273,11 @@ func (a Agent) runCustomerContainer(ctx context.Context, containerID string) err
 		}
 		if status.State.Status != "running" {
 			slog.Info("container is not running")
+			// TODO handle error or succeeded by checking exit code
+			taskStateChan <- taskStatusMessage{
+				Name:   taskName,
+				Status: taskStatusSucceeded,
+			}
 			break
 		} else {
 			slog.Info("container is running")
@@ -241,7 +296,9 @@ func (a *Agent) startHeartbeat() error {
 		for range ticker.C {
 			a.checkAuth()
 
-			jsonBody := []byte(`{"agentName": "%v", "poolLabels": ["small-hil"]}`)
+			fmt.Println("heartbeat status", a.Status)
+
+			jsonBody := []byte(fmt.Sprintf(`{"agentName": "%v", "poolLabels": %v}`, a.Name, a.PoolLabels))
 			bodyReader := bytes.NewReader(jsonBody)
 
 			hb, _ := http.NewRequest(http.MethodPost, url, bodyReader)
@@ -253,6 +310,25 @@ func (a *Agent) startHeartbeat() error {
 			}
 		}
 	}()
+
+	return nil
+}
+
+func (a *Agent) updateTaskStatus(taskName string, status taskStatus) error {
+	updateStatusURL := fmt.Sprintf("%v/task/%v/update", a.ApiHost, taskName)
+
+	a.checkAuth()
+
+	jsonBody := []byte(fmt.Sprintf(`{"status": "%v"}`, status))
+	bodyReader := bytes.NewReader(jsonBody)
+
+	ts, _ := http.NewRequest(http.MethodPost, updateStatusURL, bodyReader)
+	ts.Header.Add("authorization", fmt.Sprintf("Bearer %v", a.Token.AccessToken))
+	ts.Header.Set("Content-Type", "application/json")
+	_, err := http.DefaultClient.Do(ts)
+	if err != nil {
+		slog.Error("error in task status update", "error", err)
+	}
 
 	return nil
 }
