@@ -17,20 +17,14 @@ func TestAgentSuite(s *testing.T) {
 }
 
 func (s *AgentTestSuite) TestStringifyEnvironmentVariables() {
-	inputVars := [][]string{
-		{
-			"RERUN_WORKER_FOO",
-			"bar",
-		},
-		{
-			"RERUN_WORKER_BAR",
-			"foo",
-		},
+	inputVars := map[string]string{
+		"RERUN_WORKER_FOO": "bar",
+		"RERUN_WORKER_BAR": "foo",
 	}
 
 	outputVars := stringifyEnvironmentVariables(inputVars)
 
-	s.Equal([]string{
+	s.ElementsMatch([]string{
 		"RERUN_WORKER_FOO=bar",
 		"RERUN_WORKER_BAR=foo",
 	}, outputVars)

@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
@@ -37,7 +36,7 @@ type Task struct {
 	Name                 string
 	WorkerImageURI       string
 	CustomerImageURI     string
-	EnvironmentVariables []string
+	EnvironmentVariables map[string]string
 	Tags                 [][]string
 }
 
@@ -152,13 +151,18 @@ func (a Agent) getTask() Task {
 		log.Fatal(err)
 	}
 
+	environmentVariables := make(map[string]string)
+	for _, v := range taskResponse.EnvironmentVariables {
+		environmentVariables[v[0]] = v[1]
+	}
+
 	task := Task{
-		EnvironmentVariables: stringifyEnvironmentVariables(taskResponse.EnvironmentVariables),
+		EnvironmentVariables: environmentVariables,
 		WorkerImageURI:       taskResponse.WorkerImageURI,
 		Tags:                 taskResponse.Tags,
 		Name:                 taskResponse.Name,
 	}
-	task.CustomerImageURI = getCustomerImageURI(taskResponse.EnvironmentVariables)
+	task.CustomerImageURI = environmentVariables["RERUN_WORKER_BUILD_IMAGE_URI"]
 
 	return task
 }
@@ -167,7 +171,7 @@ func (a Agent) createCustomerContainer(task Task) string {
 	config := &container.Config{
 		Image: task.WorkerImageURI,
 		// Cmd:   []string{"echo", "hello world"},
-		Env: task.EnvironmentVariables,
+		Env: stringifyEnvironmentVariables(task.EnvironmentVariables),
 	}
 	res, err := a.DockerClient.ContainerCreate(
 		context.TODO(),
@@ -197,11 +201,10 @@ func (a Agent) createCustomerContainer(task Task) string {
 	return res.ID
 }
 
-func stringifyEnvironmentVariables(inputVars [][]string) []string {
+func stringifyEnvironmentVariables(inputVars map[string]string) []string {
 	var envVars []string
-	for _, envVar := range inputVars {
-		envVarString := strings.Join(envVar, "=")
-
+	for k, v := range inputVars {
+		envVarString := fmt.Sprintf("%v=%v", k, v)
 		envVars = append(envVars, envVarString)
 	}
 	return envVars
