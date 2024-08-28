@@ -12,12 +12,14 @@ import (
 	"os"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/resim-ai/agent/api"
 	"golang.org/x/oauth2"
 )
 
@@ -30,23 +32,24 @@ const (
 	agentStatusError    agentStatus = "ERROR"
 )
 
-type taskStatus string
+// type taskStatus string
 
-const (
-	taskStatusRunning   taskStatus = "RUNNING"
-	taskStatusStarting  taskStatus = "STARTING"
-	taskStatusError     taskStatus = "ERROR"
-	taskStatusSucceeded taskStatus = "SUCCEEDED"
-)
+// const (
+// 	taskStatusRunning   taskStatus = "RUNNING"
+// 	taskStatusStarting  taskStatus = "STARTING"
+// 	taskStatusError     taskStatus = "ERROR"
+// 	taskStatusSucceeded taskStatus = "SUCCEEDED"
+// )
 
 type taskStatusMessage struct {
 	Name   string
-	Status taskStatus
+	Status api.TaskStatus
 }
 
 type Agent struct {
+	ApiClient          *api.Client
 	DockerClient       *client.Client
-	Token              oauth2.Token
+	Token              *oauth2.Token
 	ClientID           string
 	AuthHost           string
 	ApiHost            string
@@ -54,6 +57,8 @@ type Agent struct {
 	PoolLabels         []string
 	ConfigFileOverride string
 	Status             agentStatus
+	CurrentTaskName    string
+	CurrentTaskStatus  api.TaskStatus
 }
 
 type Task struct {
@@ -75,23 +80,39 @@ type TaskResponse struct {
 // set up volumes
 // upload outputs
 
-func Start(agent Agent) {
-	err := agent.loadConfig()
+func Start(a Agent) {
+	err := a.loadConfig()
 	if err != nil {
 		log.Fatal("error loading config", err)
 	}
 
-	err = agent.initializeDockerClient()
+	err = a.initializeDockerClient()
 	if err != nil {
 		log.Fatal("error initializing Docker client", err)
 	}
-	defer agent.DockerClient.Close()
+	defer a.DockerClient.Close()
 
-	err = agent.checkAuth()
+	err = a.checkAuth()
 	if err != nil {
 		log.Fatal("error in authentication")
 	}
 
+	ctx := context.Background()
+
+	// start api.Client
+	var tokenSource oauth2.TokenSource
+	tokenSource = oauth2.ReuseTokenSource(a.Token, tokenSource)
+	oauthClient := oauth2.NewClient(ctx, tokenSource)
+	a.Token, err = tokenSource.Token()
+	if err != nil {
+		log.Fatal(err)
+	}
+	a.ApiClient, err = api.NewClient(a.ApiHost, api.WithHTTPClient(oauthClient))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	spew.Dump(a.Token)
 	agentStateChan := make(chan agentStatus)
 	taskStateChan := make(chan taskStatusMessage)
 
@@ -99,33 +120,31 @@ func Start(agent Agent) {
 		for {
 			select {
 			case taskStatusMessage := <-taskStateChan:
-				agent.updateTaskStatus(taskStatusMessage.Name, taskStatusMessage.Status)
+				a.updateTaskStatus(ctx, taskStatusMessage.Name, taskStatusMessage.Status)
 			case agentStatus := <-agentStateChan:
-				agent.Status = agentStatus
+				a.Status = agentStatus
 			}
 		}
 	}()
 
 	agentStateChan <- agentStatusIdle
 
-	agent.startHeartbeat()
-
-	ctx := context.Background()
+	a.startHeartbeat(ctx)
 
 	for {
-		agent.checkAuth()
+		a.checkAuth()
 
-		task := agent.getTask()
+		task := a.getTask()
 		taskStateChan <- taskStatusMessage{
 			Name:   task.Name,
-			Status: taskStatusStarting,
+			Status: api.STARTING,
 		}
 		agentStateChan <- agentStatusRunning
-		agent.pullImage(ctx, task.WorkerImageURI)
-		agent.pullImage(ctx, task.CustomerImageURI)
+		a.pullImage(ctx, task.WorkerImageURI)
+		a.pullImage(ctx, task.CustomerImageURI)
 
-		customerContainerID := agent.createCustomerContainer(task)
-		err := agent.runCustomerContainer(ctx, customerContainerID, task.Name, taskStateChan)
+		customerContainerID := a.createCustomerContainer(task)
+		err := a.runCustomerContainer(ctx, customerContainerID, task.Name, taskStateChan)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -215,9 +234,10 @@ func (a Agent) getTask() Task {
 
 func (a Agent) createCustomerContainer(task Task) string {
 	config := &container.Config{
-		Image: task.WorkerImageURI,
-		// Cmd:   []string{"echo", "hello world"},
-		Env: stringifyEnvironmentVariables(task.EnvironmentVariables),
+		// Image:      task.WorkerImageURI,
+		Image: "public.ecr.aws/ubuntu/ubuntu:latest",
+		Cmd:   []string{"sleep", "90"},
+		Env:   stringifyEnvironmentVariables(task.EnvironmentVariables),
 	}
 	res, err := a.DockerClient.ContainerCreate(
 		context.TODO(),
@@ -264,7 +284,7 @@ func (a Agent) runCustomerContainer(ctx context.Context, containerID string, tas
 	slog.Info("container started")
 	taskStateChan <- taskStatusMessage{
 		Name:   taskName,
-		Status: taskStatusRunning,
+		Status: api.RUNNING,
 	}
 	for {
 		status, err := a.DockerClient.ContainerInspect(ctx, containerID)
@@ -276,7 +296,7 @@ func (a Agent) runCustomerContainer(ctx context.Context, containerID string, tas
 			// TODO handle error or succeeded by checking exit code
 			taskStateChan <- taskStatusMessage{
 				Name:   taskName,
-				Status: taskStatusSucceeded,
+				Status: api.SUCCEEDED,
 			}
 			break
 		} else {
@@ -287,48 +307,47 @@ func (a Agent) runCustomerContainer(ctx context.Context, containerID string, tas
 	return nil
 }
 
-func (a *Agent) startHeartbeat() error {
-	ticker := time.NewTicker(30 * time.Second)
+func (a *Agent) startHeartbeat(ctx context.Context) error {
+	ticker := time.NewTicker(10 * time.Second)
 
-	url := fmt.Sprintf("%v/agent/heartbeat", a.ApiHost)
+	// url := fmt.Sprintf("%v/agent/heartbeat", a.ApiHost)
+
+	hbInput := api.AgentHeartbeatInput{
+		AgentName:  &a.Name,
+		PoolLabels: &a.PoolLabels,
+	}
 
 	go func() {
 		for range ticker.C {
-			a.checkAuth()
 
-			fmt.Println("heartbeat status", a.Status)
-
-			jsonBody := []byte(fmt.Sprintf(`{"agentName": "%v", "poolLabels": %v}`, a.Name, a.PoolLabels))
-			bodyReader := bytes.NewReader(jsonBody)
-
-			hb, _ := http.NewRequest(http.MethodPost, url, bodyReader)
-			hb.Header.Add("authorization", fmt.Sprintf("Bearer %v", a.Token.AccessToken))
-			hb.Header.Set("Content-Type", "application/json")
-			_, err := http.DefaultClient.Do(hb)
-			if err != nil {
-				slog.Error("error in heartbeat")
+			hbInput.TaskName = &a.CurrentTaskName
+			hbInput.TaskStatus = &a.CurrentTaskStatus
+			if hbInput.TaskName == nil {
+				none := "none"
+				hbInput.TaskName = &none
 			}
+
+			spew.Dump(hbInput)
+
+			res, err := a.ApiClient.AgentHeartbeat(ctx, hbInput)
+			if err != nil {
+				log.Fatal(err)
+			}
+			slog.Info("hb", "url", res.Request.URL, "status", res.StatusCode, "body", res.Request.Body)
 		}
 	}()
 
 	return nil
 }
 
-func (a *Agent) updateTaskStatus(taskName string, status taskStatus) error {
-	updateStatusURL := fmt.Sprintf("%v/task/%v/update", a.ApiHost, taskName)
+func (a *Agent) updateTaskStatus(ctx context.Context, taskName string, status api.TaskStatus) error {
+	a.CurrentTaskName = taskName
+	a.CurrentTaskStatus = status
 
-	a.checkAuth()
+	res, err := a.ApiClient.UpdateTask(ctx, taskName, api.UpdateTaskInput{
+		Status: &status,
+	})
+	spew.Dump(res.StatusCode)
 
-	jsonBody := []byte(fmt.Sprintf(`{"status": "%v"}`, status))
-	bodyReader := bytes.NewReader(jsonBody)
-
-	ts, _ := http.NewRequest(http.MethodPost, updateStatusURL, bodyReader)
-	ts.Header.Add("authorization", fmt.Sprintf("Bearer %v", a.Token.AccessToken))
-	ts.Header.Set("Content-Type", "application/json")
-	_, err := http.DefaultClient.Do(ts)
-	if err != nil {
-		slog.Error("error in task status update", "error", err)
-	}
-
-	return nil
+	return err
 }

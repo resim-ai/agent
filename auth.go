@@ -94,7 +94,7 @@ func (a *Agent) authenticate(mode AuthMode) {
 		log.Fatal(err)
 	}
 
-	a.Token = oauth2.Token{
+	a.Token = &oauth2.Token{
 		AccessToken:  tj.AccessToken,
 		TokenType:    tj.TokenType,
 		RefreshToken: tj.RefreshToken,
