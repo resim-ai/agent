@@ -30,28 +30,6 @@ func (s *AgentTestSuite) TestStringifyEnvironmentVariables() {
 	}, outputVars)
 }
 
-func (s *AgentTestSuite) TestGetCustomerImageURI() {
-	inputVars := [][]string{
-		{
-			"RERUN_WORKER_FOO",
-			"bar",
-		},
-		{
-			"RERUN_WORKER_BAR",
-			"foo",
-		},
-		{
-			"RERUN_WORKER_BUILD_IMAGE_URI",
-			"a.test.image/namespace/repo:tag",
-		},
-	}
-
-	expectedCustomerImageURI := "a.test.image/namespace/repo:tag"
-	actualCustomerImageURI := getCustomerImageURI(inputVars)
-
-	s.Equal(expectedCustomerImageURI, actualCustomerImageURI)
-}
-
 func (s *AgentTestSuite) TestLoadConfigFile() {
 	f, err := os.CreateTemp("/tmp", "config.yaml")
 	if err != nil {

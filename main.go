@@ -256,12 +256,3 @@ func (a *Agent) startHeartbeat() error {
 
 	return nil
 }
-
-func getCustomerImageURI(envVars [][]string) string {
-	for _, envVar := range envVars {
-		if envVar[0] == "RERUN_WORKER_BUILD_IMAGE_URI" {
-			return envVar[1]
-		}
-	}
-	return ""
-}
