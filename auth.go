@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -100,8 +101,6 @@ func (a *Agent) authenticate(mode AuthMode) {
 		RefreshToken: tj.RefreshToken,
 		Expiry:       time.Now().Add(time.Duration(tj.ExpiresIn) * time.Second),
 	}
-
-	a.saveCredentialCache()
 }
 
 func (a *Agent) loadCredentialCache() {
@@ -115,6 +114,8 @@ func (a *Agent) loadCredentialCache() {
 }
 
 func (a Agent) saveCredentialCache() {
+	slog.Info("saving credential cache")
+
 	data, err := json.Marshal(a.Token)
 	if err != nil {
 		log.Println("error marshaling credential cache:", err)

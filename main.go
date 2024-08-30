@@ -47,9 +47,10 @@ type taskStatusMessage struct {
 }
 
 type Agent struct {
-	ApiClient          *api.Client
-	DockerClient       *client.Client
-	Token              *oauth2.Token
+	ApiClient    *api.Client
+	DockerClient *client.Client
+	Token        *oauth2.Token
+	// tokenSource
 	ClientID           string
 	AuthHost           string
 	ApiHost            string
@@ -99,6 +100,10 @@ func Start(a Agent) {
 
 	ctx := context.Background()
 
+	// 1. can we do password-realm auth in the oauth2 client? no
+	// 2. is there a way to pass a token straight in to the api client without using the oauth2 client?
+	// 3. how do we make sure we save the token on exit (and refresh)?
+
 	// start api.Client
 	var tokenSource oauth2.TokenSource
 	tokenSource = oauth2.ReuseTokenSource(a.Token, tokenSource)
@@ -111,6 +116,7 @@ func Start(a Agent) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer a.saveCredentialCache()
 
 	spew.Dump(a.Token)
 	agentStateChan := make(chan agentStatus)
@@ -135,6 +141,7 @@ func Start(a Agent) {
 		a.checkAuth()
 
 		task := a.getTask()
+		fmt.Println("task name", task.Name)
 		taskStateChan <- taskStatusMessage{
 			Name:   task.Name,
 			Status: api.STARTING,
@@ -311,20 +318,21 @@ func (a *Agent) startHeartbeat(ctx context.Context) error {
 	ticker := time.NewTicker(10 * time.Second)
 
 	// url := fmt.Sprintf("%v/agent/heartbeat", a.ApiHost)
-
+	// none := "none"
 	hbInput := api.AgentHeartbeatInput{
 		AgentName:  &a.Name,
 		PoolLabels: &a.PoolLabels,
+		TaskName:   nil,
 	}
 
 	go func() {
 		for range ticker.C {
 
-			hbInput.TaskName = &a.CurrentTaskName
-			hbInput.TaskStatus = &a.CurrentTaskStatus
-			if hbInput.TaskName == nil {
-				none := "none"
-				hbInput.TaskName = &none
+			if a.CurrentTaskName != "" {
+				hbInput.TaskName = &a.CurrentTaskName
+			}
+			if a.CurrentTaskStatus != "" {
+				hbInput.TaskStatus = &a.CurrentTaskStatus
 			}
 
 			spew.Dump(hbInput)
