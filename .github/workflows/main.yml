@@ -1,0 +1,62 @@
+---
+name: Main Workflow
+on:  #trunk-ignore(yamllint/truthy)
+  push:
+    branches:
+      - main
+    tags:
+      - v*.*.*
+  pull_request:  # trunk-ignore(yamllint/empty-values)
+
+concurrency:
+  group: ${{ github.ref }}-main
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: write
+  checks: write
+  pull-requests: write
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write  # For trunk to post annotations
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Trunk Check
+        uses: trunk-io/trunk-action@v1
+
+  sbom:
+    name: Security Scan and SBOM Generation
+    uses: resim-ai/workflows/.github/workflows/security-and-sbom.yml@v3
+    with:
+      severity: MEDIUM,HIGH,CRITICAL
+      repository: agent
+    secrets:
+      app-id: ${{ secrets.DEPLOYMENT_BOT_APP_ID }}
+      private-key: ${{ secrets.DEPLOYMENT_BOT_PRIVATE_KEY }}
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  unit_test:
+    name: Unit tests and Code coverage
+    uses: ./.github/workflows/unit-test-and-codecov.yml
+    with:
+      GO_VERSION: ${{ vars.GO_VERSION }}
+    secrets:
+      codecov-token: ${{ secrets.CODECOV_TOKEN}}
+
+  build:
+    name: Build and Push Container Images
+    uses: ./.github/workflows/build-and-push-images.yml
+    with:
+      GO_VERSION: ${{ vars.GO_VERSION }}
+    secrets:
+      app-id: ${{ secrets.DEPLOYMENT_BOT_APP_ID }}
+      private-key: ${{ secrets.DEPLOYMENT_BOT_PRIVATE_KEY }}
+
+# TODO: Integration test https://app.asana.com/0/1207977581994839/1208362865864394/f
