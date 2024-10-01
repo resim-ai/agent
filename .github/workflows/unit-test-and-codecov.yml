@@ -1,0 +1,82 @@
+---
+name: Test & Generate CodeCov Report
+on:  #trunk-ignore(yamllint/truthy)
+  workflow_call:
+    inputs:
+      GO_VERSION:
+        required: true
+        type: string
+    secrets:
+      codecov-token:
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.ref }}-test
+  cancel-in-progress: true
+
+jobs:
+  unit-test:
+    name: Unit tests and Code coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ inputs.GO_VERSION }}
+          cache: false  # NOTE: This creates a duplicate cache with a different key but doesn't work with the docker caching used elsewhere
+
+      - name: Go Build Cache
+        id: go-build-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-build-cache-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-build-cache-
+
+      - name: Build Go
+        if: steps.go-build-cache.outputs.cache-hit != 'true'
+        run: go build -buildvcs=false ./...
+
+      - name: Test and Run coverage
+        run: go test ./... -v -json -race -coverprofile=coverage.out > raw_test_output.json
+
+      - name: Display test output
+        if: always()
+        run: cat raw_test_output.json
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: raw_test_output.json
+
+      # Skip Codecov upload if [skip-codecov] is present in the commit message
+      # Only use this when coverage failures are unrelated to the PR's primary purpose
+      # (e.g., adding a new lint check causes the patch coverage check to fail)
+      - name: Check for Codecov skip
+        id: check_skip
+        run: |
+          if git log -1 --pretty=%B ${{ github.event.pull_request.head.sha }} | grep -qF "[skip-codecov]"; then
+            echo "skip_codecov=true" >> "$GITHUB_OUTPUT"
+            echo "[skip-codecov] tag found. Codecov upload will be skipped."
+          else
+            echo "skip_codecov=false" >> "$GITHUB_OUTPUT"
+            echo "[skip-codecov] tag not found. Proceeding with Codecov upload."
+          fi
+
+      - name: Upload coverage to Codecov
+        if: steps.check_skip.outputs.skip_codecov != 'true'
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.codecov-token }}
+          fail_ci_if_error: true

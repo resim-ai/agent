@@ -1,0 +1,97 @@
+---
+name: Build & Push Server Images
+on:  #trunk-ignore(yamllint/truthy)
+  workflow_call:
+    inputs:
+      GO_VERSION:
+        required: true
+        type: string
+    secrets:
+      app-id:
+        required: true
+      private-key:
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+env:
+  registry: 909785973729.dkr.ecr.us-east-1.amazonaws.com
+
+jobs:
+  docker_build_push:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_PAT: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate Deployment Bot token
+        uses: actions/create-github-app-token@v1
+        id: get_token
+        with:
+          app-id: ${{ secrets.app-id }}
+          private-key: ${{ secrets.private-key }}
+          owner: ${{ github.repository_owner }}
+          repositories: agent
+
+      - name: Configure AWS Credentials us-east-1
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::909785973729:role/actions-agent
+          aws-region: us-east-1
+
+      - name: Login to ECR us-east-1
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.registry }}
+
+      - name: Pull latest image
+        run: docker pull ${{ env.registry }}/agent:main
+        continue-on-error: true
+
+      - name: Go Build Cache for Docker
+        id: go-build-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            go-build-cache
+            go-mod-cache
+          key: ${{ runner.os }}-go-build-cache-${{ hashFiles('**/go.sum') }}
+
+      - name: Inject cache into docker
+        uses: reproducible-containers/buildkit-cache-dance@v3
+        with:
+          cache-map: |
+            {
+              "go-build-cache": "/root/.cache/go-build",
+              "go-mod-cache": "/root/go/pkg/mod"
+            }
+          # NOTE: If we have a cache hit on everything, we skip this entirely
+          skip-extraction: ${{ steps.go-build-cache.outputs.cache-hit }}
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          # list of Docker images to use as base name for tags
+          images: |
+            ${{ env.registry }}/agent
+          # generate Docker tags based on the following events/attributes
+          tags: |
+            type=ref,event=pr
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha
+          labels: |
+            org.opencontainers.image.title="ReSim Agent"
+            org.opencontainers.image.description="ReSim remote execution agent"
+            org.opencontainers.image.vendor="ReSim"
+
+      - name: Docker Build and Push
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
