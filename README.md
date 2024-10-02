@@ -9,6 +9,12 @@ sudo chgrp docker /run/containerd/containerd.sock
 ```
 
 ## Development Prerequisites
+
 In addition to the above,
-- Golang 
-[development](https://github.com/containerd/containerd/blob/main/docs/getting-started.md#implementing-your-own-containerd-client)
+
+- Golang
+  [development](https://github.com/containerd/containerd/blob/main/docs/getting-started.md#implementing-your-own-containerd-client)
+
+## CI
+
+`GO_VERSION` is set as global variable in the repository settings
