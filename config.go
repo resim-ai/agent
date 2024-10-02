@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	ApiHostDefault          = "https://api.resim.ai/v1"
+	ApiHostDefault          = "https://agentapi.resim.ai/agent/v1"
 	ApiHostKey              = "api-host"
 	AuthHostDefault         = "https://resim.us.auth0.com"
 	AuthHostKey             = "auth-host"

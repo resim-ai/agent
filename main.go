@@ -3,12 +3,10 @@ package agent
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"log/slog"
-	"net/http"
 	"os"
 	"time"
 
@@ -47,7 +45,7 @@ type taskStatusMessage struct {
 }
 
 type Agent struct {
-	ApiClient    *api.Client
+	ApiClient    *api.ClientWithResponses
 	DockerClient *client.Client
 	Token        *oauth2.Token
 	// tokenSource
@@ -62,20 +60,7 @@ type Agent struct {
 	CurrentTaskStatus  api.TaskStatus
 }
 
-type Task struct {
-	Name                 string
-	WorkerImageURI       string
-	CustomerImageURI     string
-	EnvironmentVariables map[string]string
-	Tags                 [][]string
-}
-
-type TaskResponse struct {
-	Name                 string     `json:"taskName"`
-	WorkerImageURI       string     `json:"workerImageURI"`
-	EnvironmentVariables [][]string `json:"environmentVariables"`
-	Tags                 [][]string `json:"tags"`
-}
+type Task api.TaskPollOutput
 
 // TODO
 // set up volumes
@@ -112,13 +97,12 @@ func Start(a Agent) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	a.ApiClient, err = api.NewClient(a.ApiHost, api.WithHTTPClient(oauthClient))
+	a.ApiClient, err = api.NewClientWithResponses(a.ApiHost, api.WithHTTPClient(oauthClient))
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer a.saveCredentialCache()
 
-	spew.Dump(a.Token)
 	agentStateChan := make(chan agentStatus)
 	taskStateChan := make(chan taskStatusMessage)
 
@@ -141,22 +125,27 @@ func Start(a Agent) {
 		a.checkAuth()
 
 		task := a.getTask()
-		fmt.Println("task name", task.Name)
+		if task.TaskName == nil {
+			fmt.Println("no task found")
+			time.Sleep(20 * time.Second)
+			continue
+		}
+		fmt.Println("task name", task.TaskName)
 		taskStateChan <- taskStatusMessage{
-			Name:   task.Name,
+			Name:   *task.TaskName,
 			Status: api.STARTING,
 		}
 		agentStateChan <- agentStatusRunning
-		a.pullImage(ctx, task.WorkerImageURI)
-		a.pullImage(ctx, task.CustomerImageURI)
+		a.pullImage(ctx, *task.WorkerImageURI)
+		// a.pullImage(ctx, *task.WorkerEnvironmentVariables[][])
 
-		customerContainerID := a.createCustomerContainer(task)
-		err := a.runCustomerContainer(ctx, customerContainerID, task.Name, taskStateChan)
-		if err != nil {
-			log.Fatal(err)
-		}
-		agentStateChan <- agentStatusIdle
-		time.Sleep(50 * time.Second)
+		// customerContainerID := a.createCustomerContainer(task)
+		// err := a.runCustomerContainer(ctx, customerContainerID, task.Name, taskStateChan)
+		// if err != nil {
+		// 	log.Fatal(err)
+		// }
+		// agentStateChan <- agentStatusIdle
+		// time.Sleep(50 * time.Second)
 	}
 }
 
@@ -199,44 +188,25 @@ func GetConfigDir() (string, error) {
 	return expectedDir, nil
 }
 
-func (a Agent) getTask() Task {
-	url := fmt.Sprintf("%v/task/poll", a.ApiHost)
-	jsonBody := []byte(`{"workerID": "big-yin", "poolLabels": ["small-hil"]}`)
-	// jsonBody := []byte(`{"workerID": "big-yin", "poolLabels": ["small-hil", "big-hil"]}`) // example of no content
-	bodyReader := bytes.NewReader(jsonBody)
+func (a Agent) getTask() api.TaskPollOutput {
+	ctx := context.Background()
 
-	req, _ := http.NewRequest(http.MethodPost, url, bodyReader)
-
-	req.Header.Add("authorization", fmt.Sprintf("Bearer %v", a.Token.AccessToken))
-	req.Header.Set("Content-Type", "application/json")
-
-	res, err := http.DefaultClient.Do(req)
+	pollResponse, err := a.ApiClient.TaskPollWithResponse(ctx, api.TaskPollInput{
+		WorkerID:   a.Name,
+		PoolLabels: a.PoolLabels,
+	})
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("error polling for task", "err", err)
 	}
-	defer res.Body.Close()
-	body, _ := io.ReadAll(res.Body)
-
-	var taskResponse TaskResponse
-	err = json.Unmarshal(body, &taskResponse)
-	if err != nil {
-		log.Fatal(err)
+	if pollResponse.StatusCode() == 204 {
+		slog.Debug("No task available")
+		return api.TaskPollOutput{}
 	}
 
-	environmentVariables := make(map[string]string)
-	for _, v := range taskResponse.EnvironmentVariables {
-		environmentVariables[v[0]] = v[1]
-	}
+	task := pollResponse.JSON200
+	fmt.Println(task)
 
-	task := Task{
-		EnvironmentVariables: environmentVariables,
-		WorkerImageURI:       taskResponse.WorkerImageURI,
-		Tags:                 taskResponse.Tags,
-		Name:                 taskResponse.Name,
-	}
-	task.CustomerImageURI = environmentVariables["RERUN_WORKER_BUILD_IMAGE_URI"]
-
-	return task
+	return api.TaskPollOutput{}
 }
 
 func (a Agent) createCustomerContainer(task Task) string {
@@ -244,7 +214,7 @@ func (a Agent) createCustomerContainer(task Task) string {
 		// Image:      task.WorkerImageURI,
 		Image: "public.ecr.aws/ubuntu/ubuntu:latest",
 		Cmd:   []string{"sleep", "90"},
-		Env:   stringifyEnvironmentVariables(task.EnvironmentVariables),
+		// Env:   stringifyEnvironmentVariables(task.EnvironmentVariables),
 	}
 	res, err := a.DockerClient.ContainerCreate(
 		context.TODO(),
@@ -265,7 +235,7 @@ func (a Agent) createCustomerContainer(task Task) string {
 		},
 		&network.NetworkingConfig{},
 		&v1.Platform{},
-		task.Name,
+		*task.TaskName,
 	)
 	if err != nil {
 		fmt.Println(err)
@@ -334,8 +304,6 @@ func (a *Agent) startHeartbeat(ctx context.Context) error {
 			if a.CurrentTaskStatus != "" {
 				hbInput.TaskStatus = &a.CurrentTaskStatus
 			}
-
-			spew.Dump(hbInput)
 
 			res, err := a.ApiClient.AgentHeartbeat(ctx, hbInput)
 			if err != nil {
