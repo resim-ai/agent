@@ -15,10 +15,10 @@ lint:
     - yamllint@1.35.1
     - git-diff-check
     - gofmt
-    - golangci-lint
+    - golangci-lint@v1.61.0
+    - hadolint@v2.12.0
   disabled:
     - gitleaks
-    - hadolint  # NOTE: This just doesn't work
 runtimes:
   enabled:
     - go@1.23.1
