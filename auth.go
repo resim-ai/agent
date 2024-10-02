@@ -38,19 +38,23 @@ type tokenJSON struct {
 
 func (a *Agent) checkAuth() error {
 	a.loadCredentialCache()
-
-	if time.Now().After(a.Token.Expiry.Add(-10*time.Second)) && a.Token.RefreshToken != "" {
-		a.authenticate(authModeRefresh)
+	if a.Token != nil && time.Now().After(a.Token.Expiry.Add(-10*time.Second)) && a.Token.RefreshToken != "" {
+		token := a.authenticate(authModeRefresh)
+		if token.Valid() {
+			a.Token = token
+		} else {
+			a.Token = a.authenticate(authModePassword)
+		}
 		a.saveCredentialCache()
 	} else if !(a.Token.Valid()) {
-		a.authenticate(authModePassword)
+		a.Token = a.authenticate(authModePassword)
 		a.saveCredentialCache()
 	}
 
 	return nil
 }
 
-func (a *Agent) authenticate(mode AuthMode) {
+func (a *Agent) authenticate(mode AuthMode) *oauth2.Token {
 
 	tokenURL := fmt.Sprintf("%v/oauth/token", a.AuthHost)
 	username := viper.GetString(UsernameKey)
@@ -95,7 +99,7 @@ func (a *Agent) authenticate(mode AuthMode) {
 		log.Fatal(err)
 	}
 
-	a.Token = &oauth2.Token{
+	return &oauth2.Token{
 		AccessToken:  tj.AccessToken,
 		TokenType:    tj.TokenType,
 		RefreshToken: tj.RefreshToken,

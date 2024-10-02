@@ -12,10 +12,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/oapi-codegen/runtime"
-	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 const (
@@ -30,14 +28,6 @@ const (
 	SUCCEEDED TaskStatus = "SUCCEEDED"
 )
 
-// Defines values for TaskType.
-const (
-	BATCHMETRICS TaskType = "BATCH_METRICS"
-	EXPERIENCE   TaskType = "EXPERIENCE"
-	METRICS      TaskType = "METRICS"
-	REPORT       TaskType = "REPORT"
-)
-
 // AgentHeartbeatInput defines model for agentHeartbeatInput.
 type AgentHeartbeatInput struct {
 	AgentName  *string      `json:"agentName,omitempty"`
@@ -46,33 +36,34 @@ type AgentHeartbeatInput struct {
 	TaskStatus *TaskStatus  `json:"taskStatus,omitempty"`
 }
 
+// EnvironmentVariable defines model for environmentVariable.
+type EnvironmentVariable = []string
+
 // PoolLabel defines model for poolLabel.
 type PoolLabel = string
+
+// TagPair defines model for tagPair.
+type TagPair = []string
 
 // TaskName defines model for taskName.
 type TaskName = string
 
-// TaskRecordCreationOutput defines model for taskRecordCreationOutput.
-type TaskRecordCreationOutput = openapi_types.UUID
+// TaskPollInput defines model for taskPollInput.
+type TaskPollInput struct {
+	PoolLabels []PoolLabel `json:"poolLabels"`
+	WorkerID   string      `json:"workerID"`
+}
 
-// TaskRecordInput defines model for taskRecordInput.
-type TaskRecordInput struct {
-	Billable       bool               `json:"billable"`
-	EndTimestamp   time.Time          `json:"endTimestamp"`
-	Gpu            int                `json:"gpu"`
-	MemoryMiB      int                `json:"memoryMiB"`
-	OrgID          string             `json:"orgID"`
-	ParentID       openapi_types.UUID `json:"parentID"`
-	ParentType     TaskType           `json:"parentType"`
-	StartTimestamp time.Time          `json:"startTimestamp"`
-	Vcpus          int                `json:"vcpus"`
+// TaskPollOutput defines model for taskPollOutput.
+type TaskPollOutput struct {
+	Tags                       *[]TagPair             `json:"tags,omitempty"`
+	TaskName                   *TaskName              `json:"taskName,omitempty"`
+	WorkerEnvironmentVariables *[]EnvironmentVariable `json:"workerEnvironmentVariables,omitempty"`
+	WorkerImageURI             *string                `json:"workerImageURI,omitempty"`
 }
 
 // TaskStatus defines model for taskStatus.
 type TaskStatus string
-
-// TaskType defines model for taskType.
-type TaskType string
 
 // UpdateTaskInput defines model for updateTaskInput.
 type UpdateTaskInput struct {
@@ -83,8 +74,8 @@ type UpdateTaskInput struct {
 // AgentHeartbeatJSONRequestBody defines body for AgentHeartbeat for application/json ContentType.
 type AgentHeartbeatJSONRequestBody = AgentHeartbeatInput
 
-// CreateTaskRecordJSONRequestBody defines body for CreateTaskRecord for application/json ContentType.
-type CreateTaskRecordJSONRequestBody = TaskRecordInput
+// TaskPollJSONRequestBody defines body for TaskPoll for application/json ContentType.
+type TaskPollJSONRequestBody = TaskPollInput
 
 // UpdateTaskJSONRequestBody defines body for UpdateTask for application/json ContentType.
 type UpdateTaskJSONRequestBody = UpdateTaskInput
@@ -162,26 +153,50 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+	// AgentAPIPing request
+	AgentAPIPing(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// Health request
+	Health(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// AgentHeartbeatWithBody request with any body
 	AgentHeartbeatWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	AgentHeartbeat(ctx context.Context, body AgentHeartbeatJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// Health request
-	Health(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// TaskPollWithBody request with any body
+	TaskPollWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CreateTaskRecordWithBody request with any body
-	CreateTaskRecordWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	CreateTaskRecord(ctx context.Context, body CreateTaskRecordJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	TaskPoll(ctx context.Context, body TaskPollJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateTaskWithBody request with any body
 	UpdateTaskWithBody(ctx context.Context, taskName TaskName, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	UpdateTask(ctx context.Context, taskName TaskName, body UpdateTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
 
-	// WorkerAPIPing request
-	WorkerAPIPing(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+func (c *Client) AgentAPIPing(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAgentAPIPingRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) Health(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewHealthRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 func (c *Client) AgentHeartbeatWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -208,8 +223,8 @@ func (c *Client) AgentHeartbeat(ctx context.Context, body AgentHeartbeatJSONRequ
 	return c.Client.Do(req)
 }
 
-func (c *Client) Health(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewHealthRequest(c.Server)
+func (c *Client) TaskPollWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTaskPollRequestWithBody(c.Server, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -220,20 +235,8 @@ func (c *Client) Health(ctx context.Context, reqEditors ...RequestEditorFn) (*ht
 	return c.Client.Do(req)
 }
 
-func (c *Client) CreateTaskRecordWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateTaskRecordRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) CreateTaskRecord(ctx context.Context, body CreateTaskRecordJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateTaskRecordRequest(c.Server, body)
+func (c *Client) TaskPoll(ctx context.Context, body TaskPollJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTaskPollRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -268,31 +271,8 @@ func (c *Client) UpdateTask(ctx context.Context, taskName TaskName, body UpdateT
 	return c.Client.Do(req)
 }
 
-func (c *Client) WorkerAPIPing(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewWorkerAPIPingRequest(c.Server)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// NewAgentHeartbeatRequest calls the generic AgentHeartbeat builder with application/json body
-func NewAgentHeartbeatRequest(server string, body AgentHeartbeatJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewAgentHeartbeatRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewAgentHeartbeatRequestWithBody generates requests for AgentHeartbeat with any type of body
-func NewAgentHeartbeatRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+// NewAgentAPIPingRequest generates requests for AgentAPIPing
+func NewAgentAPIPingRequest(server string) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -300,7 +280,7 @@ func NewAgentHeartbeatRequestWithBody(server string, contentType string, body io
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/agent/heartbeat")
+	operationPath := fmt.Sprintf("/agentapiping")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -310,12 +290,10 @@ func NewAgentHeartbeatRequestWithBody(server string, contentType string, body io
 		return nil, err
 	}
 
-	req, err := http.NewRequest("POST", queryURL.String(), body)
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
-
-	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -347,19 +325,19 @@ func NewHealthRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
-// NewCreateTaskRecordRequest calls the generic CreateTaskRecord builder with application/json body
-func NewCreateTaskRecordRequest(server string, body CreateTaskRecordJSONRequestBody) (*http.Request, error) {
+// NewAgentHeartbeatRequest calls the generic AgentHeartbeat builder with application/json body
+func NewAgentHeartbeatRequest(server string, body AgentHeartbeatJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewCreateTaskRecordRequestWithBody(server, "application/json", bodyReader)
+	return NewAgentHeartbeatRequestWithBody(server, "application/json", bodyReader)
 }
 
-// NewCreateTaskRecordRequestWithBody generates requests for CreateTaskRecord with any type of body
-func NewCreateTaskRecordRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+// NewAgentHeartbeatRequestWithBody generates requests for AgentHeartbeat with any type of body
+func NewAgentHeartbeatRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -367,7 +345,47 @@ func NewCreateTaskRecordRequestWithBody(server string, contentType string, body 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/task/record")
+	operationPath := fmt.Sprintf("/heartbeat")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewTaskPollRequest calls the generic TaskPoll builder with application/json body
+func NewTaskPollRequest(server string, body TaskPollJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewTaskPollRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewTaskPollRequestWithBody generates requests for TaskPoll with any type of body
+func NewTaskPollRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/task/poll")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -434,33 +452,6 @@ func NewUpdateTaskRequestWithBody(server string, taskName TaskName, contentType 
 	return req, nil
 }
 
-// NewWorkerAPIPingRequest generates requests for WorkerAPIPing
-func NewWorkerAPIPingRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/workerapiping")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("GET", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -504,35 +495,35 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
+	// AgentAPIPingWithResponse request
+	AgentAPIPingWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*AgentAPIPingResponse, error)
+
+	// HealthWithResponse request
+	HealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*HealthResponse, error)
+
 	// AgentHeartbeatWithBodyWithResponse request with any body
 	AgentHeartbeatWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AgentHeartbeatResponse, error)
 
 	AgentHeartbeatWithResponse(ctx context.Context, body AgentHeartbeatJSONRequestBody, reqEditors ...RequestEditorFn) (*AgentHeartbeatResponse, error)
 
-	// HealthWithResponse request
-	HealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*HealthResponse, error)
+	// TaskPollWithBodyWithResponse request with any body
+	TaskPollWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TaskPollResponse, error)
 
-	// CreateTaskRecordWithBodyWithResponse request with any body
-	CreateTaskRecordWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateTaskRecordResponse, error)
-
-	CreateTaskRecordWithResponse(ctx context.Context, body CreateTaskRecordJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateTaskRecordResponse, error)
+	TaskPollWithResponse(ctx context.Context, body TaskPollJSONRequestBody, reqEditors ...RequestEditorFn) (*TaskPollResponse, error)
 
 	// UpdateTaskWithBodyWithResponse request with any body
 	UpdateTaskWithBodyWithResponse(ctx context.Context, taskName TaskName, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateTaskResponse, error)
 
 	UpdateTaskWithResponse(ctx context.Context, taskName TaskName, body UpdateTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateTaskResponse, error)
-
-	// WorkerAPIPingWithResponse request
-	WorkerAPIPingWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*WorkerAPIPingResponse, error)
 }
 
-type AgentHeartbeatResponse struct {
+type AgentAPIPingResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 }
 
 // Status returns HTTPResponse.Status
-func (r AgentHeartbeatResponse) Status() string {
+func (r AgentAPIPingResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -540,7 +531,7 @@ func (r AgentHeartbeatResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r AgentHeartbeatResponse) StatusCode() int {
+func (r AgentAPIPingResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -568,14 +559,13 @@ func (r HealthResponse) StatusCode() int {
 	return 0
 }
 
-type CreateTaskRecordResponse struct {
+type AgentHeartbeatResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON201      *TaskRecordCreationOutput
 }
 
 // Status returns HTTPResponse.Status
-func (r CreateTaskRecordResponse) Status() string {
+func (r AgentHeartbeatResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -583,7 +573,29 @@ func (r CreateTaskRecordResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r CreateTaskRecordResponse) StatusCode() int {
+func (r AgentHeartbeatResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type TaskPollResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *TaskPollOutput
+}
+
+// Status returns HTTPResponse.Status
+func (r TaskPollResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r TaskPollResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -611,25 +623,22 @@ func (r UpdateTaskResponse) StatusCode() int {
 	return 0
 }
 
-type WorkerAPIPingResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
+// AgentAPIPingWithResponse request returning *AgentAPIPingResponse
+func (c *ClientWithResponses) AgentAPIPingWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*AgentAPIPingResponse, error) {
+	rsp, err := c.AgentAPIPing(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAgentAPIPingResponse(rsp)
 }
 
-// Status returns HTTPResponse.Status
-func (r WorkerAPIPingResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
+// HealthWithResponse request returning *HealthResponse
+func (c *ClientWithResponses) HealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*HealthResponse, error) {
+	rsp, err := c.Health(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
 	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r WorkerAPIPingResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
+	return ParseHealthResponse(rsp)
 }
 
 // AgentHeartbeatWithBodyWithResponse request with arbitrary body returning *AgentHeartbeatResponse
@@ -649,30 +658,21 @@ func (c *ClientWithResponses) AgentHeartbeatWithResponse(ctx context.Context, bo
 	return ParseAgentHeartbeatResponse(rsp)
 }
 
-// HealthWithResponse request returning *HealthResponse
-func (c *ClientWithResponses) HealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*HealthResponse, error) {
-	rsp, err := c.Health(ctx, reqEditors...)
+// TaskPollWithBodyWithResponse request with arbitrary body returning *TaskPollResponse
+func (c *ClientWithResponses) TaskPollWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TaskPollResponse, error) {
+	rsp, err := c.TaskPollWithBody(ctx, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseHealthResponse(rsp)
+	return ParseTaskPollResponse(rsp)
 }
 
-// CreateTaskRecordWithBodyWithResponse request with arbitrary body returning *CreateTaskRecordResponse
-func (c *ClientWithResponses) CreateTaskRecordWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateTaskRecordResponse, error) {
-	rsp, err := c.CreateTaskRecordWithBody(ctx, contentType, body, reqEditors...)
+func (c *ClientWithResponses) TaskPollWithResponse(ctx context.Context, body TaskPollJSONRequestBody, reqEditors ...RequestEditorFn) (*TaskPollResponse, error) {
+	rsp, err := c.TaskPoll(ctx, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseCreateTaskRecordResponse(rsp)
-}
-
-func (c *ClientWithResponses) CreateTaskRecordWithResponse(ctx context.Context, body CreateTaskRecordJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateTaskRecordResponse, error) {
-	rsp, err := c.CreateTaskRecord(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateTaskRecordResponse(rsp)
+	return ParseTaskPollResponse(rsp)
 }
 
 // UpdateTaskWithBodyWithResponse request with arbitrary body returning *UpdateTaskResponse
@@ -692,24 +692,15 @@ func (c *ClientWithResponses) UpdateTaskWithResponse(ctx context.Context, taskNa
 	return ParseUpdateTaskResponse(rsp)
 }
 
-// WorkerAPIPingWithResponse request returning *WorkerAPIPingResponse
-func (c *ClientWithResponses) WorkerAPIPingWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*WorkerAPIPingResponse, error) {
-	rsp, err := c.WorkerAPIPing(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseWorkerAPIPingResponse(rsp)
-}
-
-// ParseAgentHeartbeatResponse parses an HTTP response from a AgentHeartbeatWithResponse call
-func ParseAgentHeartbeatResponse(rsp *http.Response) (*AgentHeartbeatResponse, error) {
+// ParseAgentAPIPingResponse parses an HTTP response from a AgentAPIPingWithResponse call
+func ParseAgentAPIPingResponse(rsp *http.Response) (*AgentAPIPingResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &AgentHeartbeatResponse{
+	response := &AgentAPIPingResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -733,26 +724,42 @@ func ParseHealthResponse(rsp *http.Response) (*HealthResponse, error) {
 	return response, nil
 }
 
-// ParseCreateTaskRecordResponse parses an HTTP response from a CreateTaskRecordWithResponse call
-func ParseCreateTaskRecordResponse(rsp *http.Response) (*CreateTaskRecordResponse, error) {
+// ParseAgentHeartbeatResponse parses an HTTP response from a AgentHeartbeatWithResponse call
+func ParseAgentHeartbeatResponse(rsp *http.Response) (*AgentHeartbeatResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &CreateTaskRecordResponse{
+	response := &AgentHeartbeatResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseTaskPollResponse parses an HTTP response from a TaskPollWithResponse call
+func ParseTaskPollResponse(rsp *http.Response) (*TaskPollResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &TaskPollResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
-		var dest TaskRecordCreationOutput
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TaskPollOutput
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON201 = &dest
+		response.JSON200 = &dest
 
 	}
 
@@ -768,22 +775,6 @@ func ParseUpdateTaskResponse(rsp *http.Response) (*UpdateTaskResponse, error) {
 	}
 
 	response := &UpdateTaskResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	return response, nil
-}
-
-// ParseWorkerAPIPingResponse parses an HTTP response from a WorkerAPIPingWithResponse call
-func ParseWorkerAPIPingResponse(rsp *http.Response) (*WorkerAPIPingResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &WorkerAPIPingResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
