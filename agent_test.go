@@ -17,9 +17,9 @@ func TestAgentSuite(s *testing.T) {
 }
 
 func (s *AgentTestSuite) TestStringifyEnvironmentVariables() {
-	inputVars := map[string]string{
-		"RERUN_WORKER_FOO": "bar",
-		"RERUN_WORKER_BAR": "foo",
+	inputVars := [][]string{
+		{"RERUN_WORKER_FOO", "bar"},
+		{"RERUN_WORKER_BAR", "foo"},
 	}
 
 	outputVars := stringifyEnvironmentVariables(inputVars)
