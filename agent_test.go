@@ -39,7 +39,7 @@ func (s *AgentTestSuite) TestLoadConfigFile() {
 
 	testConfig := `api-host: https://api.resim.ai/worker/v1
 name: my-forklift
-pool-labels: 
+pool-labels:
   - small
   - big
 username: gimli
@@ -52,6 +52,6 @@ password: hunter2`
 	}
 	a.loadConfig()
 
-	s.Equal("https://api.resim.ai/worker/v1", a.ApiHost)
+	s.Equal("https://api.resim.ai/worker/v1", a.APIHost)
 	s.Equal("my-forklift", a.Name)
 }
