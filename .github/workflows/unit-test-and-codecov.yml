@@ -45,14 +45,26 @@ jobs:
       - name: Install dependencies
         run: go get .
 
+      - name: Extract PR number from ref_name
+        run: |
+          PR=$(echo "${{ github.ref_name }}" | cut -d'/' -f1)
+          echo "PR_NUMBER=pr-$PR" >> "$GITHUB_OUTPUT"
+        id: extract_pr
+
       - name: Build Go
         if: steps.go-build-cache.outputs.cache-hit != 'true'
-        run: go build -o ./agent -buildvcs=false .
+        run: go build -o ./agent-linux-amd64-${{ steps.extract_pr.outputs.PR_NUMBER }} -buildvcs=false .
+        env:
+          PR_NUMBER: ${{ steps.extract_pr.outputs.PR_NUMBER }}
 
-      - uses: actions/upload-artifact@v4
+      - name: Configure AWS Credentials us-east-1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          name: Binary
-          path: agent
+          role-to-assume: arn:aws:iam::909785973729:role/actions-agent
+          aws-region: us-east-1
+
+      - name: Upload binary to S3
+        run: aws s3 cp ./agent-* s3://resim-binaries/agent/
 
       - name: Test and Run coverage
         run: go test ./... -v -json -race -coverprofile=coverage.out > raw_test_output.json
