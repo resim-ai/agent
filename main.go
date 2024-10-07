@@ -66,17 +66,19 @@ type Task api.TaskPollOutput
 // set up volumes
 // upload outputs
 
-func Start(a Agent) {
-	err := a.loadConfig()
+func (a Agent) Start() error {
+	err := a.LoadConfig()
 	if err != nil {
-		log.Fatal("error loading config", err)
+		slog.Error("error loading config", "err", err)
+		return err
 	}
 
 	// TODO: check apiHost is available
 
 	err = a.initializeDockerClient()
 	if err != nil {
-		log.Fatal("error initializing Docker client", err)
+		slog.Error("error initializing Docker client", "err", err)
+		return err
 	}
 	defer a.DockerClient.Close()
 
@@ -221,7 +223,7 @@ func (a Agent) getTask() api.TaskPollOutput {
 	return *task
 }
 
-func stringifyEnvironmentVariables(inputVars [][]string) []string {
+func StringifyEnvironmentVariables(inputVars [][]string) []string {
 	var envVars []string
 	for _, v := range inputVars {
 		envVarString := fmt.Sprintf("%v=%v", v[0], v[1])
@@ -231,7 +233,7 @@ func stringifyEnvironmentVariables(inputVars [][]string) []string {
 }
 
 func (a Agent) runWorker(ctx context.Context, task Task, taskStateChan chan taskStatusMessage) error {
-	providedEnvVars := stringifyEnvironmentVariables(*task.WorkerEnvironmentVariables)
+	providedEnvVars := StringifyEnvironmentVariables(*task.WorkerEnvironmentVariables)
 	extraEnvVars := []string{
 		"RERUN_WORKER_SHARED_MEMORY_MB=64",
 		"RERUN_WORKER_ENVIRONMENT=dev",
