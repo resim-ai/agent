@@ -18,6 +18,7 @@ const (
 	ClientIDDefault         = devClientID // TODO default to prod
 	ClientIDKey             = "client-id"
 	PoolLabelsKey           = "pool-labels"
+	OneTaskKey              = "one-task"
 	UsernameKey             = "username"
 	PasswordKey             = "password"
 	AgentNameKey            = "name"

@@ -17,6 +17,7 @@ import (
 	"github.com/docker/docker/client"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/resim-ai/agent/api"
+	"github.com/spf13/viper"
 	"golang.org/x/oauth2"
 )
 
@@ -149,6 +150,11 @@ func Start(a Agent) {
 		}
 
 		agentStateChan <- agentStatusIdle
+
+		if viper.GetBool(OneTaskKey) {
+			slog.Info("Agent launched in one-task mode, exiting")
+			os.Exit(0)
+		}
 	}
 }
 
