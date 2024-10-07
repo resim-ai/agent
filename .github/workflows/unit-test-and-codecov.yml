@@ -47,7 +47,7 @@ jobs:
 
       - name: Build Go
         if: steps.go-build-cache.outputs.cache-hit != 'true'
-        run: go build -o ./agent -buildvcs=false ./...
+        run: go build -o ./agent -buildvcs=false .
 
       - uses: actions/upload-artifact@v4
         with:
