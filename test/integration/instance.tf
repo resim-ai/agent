@@ -128,10 +128,6 @@ EOF
 }
 
 resource "aws_iam_role" "this" {
-  lifecycle {
-    ignore_changes = all
-  }
-
   name               = "EC2CloudWatchAccessRole"
   assume_role_policy = <<EOF
 {
@@ -154,6 +150,12 @@ resource "aws_iam_policy_attachment" "this" {
   name       = "EC2CloudWatchAccessRoleAttachment"
   roles      = [aws_iam_role.this.name]
   policy_arn = aws_iam_policy.this.arn
+}
+
+resource "aws_iam_policy_attachment" "ssm" {
+  name       = "EC2CloudWatchAccessSSM"
+  roles      = [aws_iam_role.this.name]
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
 resource "aws_iam_instance_profile" "profile" {
