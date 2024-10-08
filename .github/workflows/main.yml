@@ -65,7 +65,11 @@ jobs:
   integration_tests:
     name: Run intergration tests
     uses: ./.github/workflows/integration-tests.yml
+    with:
+      pr: ${{ github.event.pull_request.number}}
     secrets:
-      GH_PERSONAL_ACCESS_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+      DEPLOYMENT_BOT_APP_ID: ${{ secrets.DEPLOYMENT_BOT_APP_ID }}
+      DEPLOYMENT_BOT_PRIVATE_KEY: ${{ secrets.DEPLOYMENT_BOT_PRIVATE_KEY }}
+      agent_password: ${{ secrets.agent_password }}
 
 # TODO: Once the repo is public, also repeat tests with `go install` as well as binary download

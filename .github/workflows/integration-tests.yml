@@ -3,59 +3,108 @@ name: Run integration tests
 on:  #trunk-ignore(yamllint/truthy)
   workflow_call:
     secrets:
-      GH_PERSONAL_ACCESS_TOKEN:
+      DEPLOYMENT_BOT_APP_ID:
         required: true
+      DEPLOYMENT_BOT_PRIVATE_KEY:
+        required: true
+      agent_password:
+        required: true
+    inputs:
+      pr:
+        description: PR number
+        required: true
+        type: number
+
 jobs:
-  start-runner:
-    name: Start self-hosted EC2 runner
+  start-instance:
     runs-on: ubuntu-latest
-    outputs:
-      label: ${{ steps.start-ec2-runner.outputs.label }}
-      ec2-instance-id: ${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
+    env:
+      TF_VAR_agent_password: "${{ secrets.agent_password }}"
+
     steps:
-      - name: Configure AWS credentials
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Generate Deployment Bot token
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.DEPLOYMENT_BOT_APP_ID }}
+          private-key: ${{ secrets.DEPLOYMENT_BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: agent
+
+      - name: Configure AWS Credentials - rerun_dev
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::840213157818:role/actions-agent
+          aws-region: us-east-1
+
+      - name: Setup AWS Profile - rerun_dev
+        run: |
+          aws configure set region us-east-1 --profile rerun_dev
+          aws configure set aws_access_key_id ${{ env.AWS_ACCESS_KEY_ID }} --profile rerun_dev
+          aws configure set aws_secret_access_key ${{ env.AWS_SECRET_ACCESS_KEY }} --profile rerun_dev
+          aws configure set aws_session_token ${{ env.AWS_SESSION_TOKEN }} --profile rerun_dev
+          aws configure list --profile rerun_dev
+          aws sts get-caller-identity --profile rerun_dev
+
+      - name: Reset AWS Environment Variables
+        run: |
+          echo "AWS_ACCESS_KEY_ID=" >> $GITHUB_ENV
+          echo "AWS_SECRET_ACCESS_KEY=" >> $GITHUB_ENV
+          echo "AWS_SESSION_TOKEN=" >> $GITHUB_ENV
+      - name: Configure AWS Credentials - infrastructure
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::909785973729:role/actions-agent
           aws-region: us-east-1
 
-      - name: Start EC2 runner
-        id: start-ec2-runner
-        uses: machulav/ec2-github-runner@v2
-        with:
-          mode: start
-          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          ec2-image-id: ami-0fff1b9a61dec8a5f
-          ec2-instance-type: t3.nano
-          subnet-id: subnet-068480ff23a430b87
-          security-group-id: sg-02994ab0d8a58f1dc
+      - name: Setup AWS Profile - infrastructure
+        run: |
+          aws configure set region us-east-1 --profile infrastructure
+          aws configure set aws_access_key_id ${{ env.AWS_ACCESS_KEY_ID }} --profile infrastructure
+          aws configure set aws_secret_access_key ${{ env.AWS_SECRET_ACCESS_KEY }} --profile infrastructure
+          aws configure set aws_session_token ${{ env.AWS_SESSION_TOKEN }} --profile infrastructure
+          aws sts get-caller-identity --profile infrastructure
 
-  do-the-job:
-    name: Do the job on the runner
-    needs: start-runner # required to start the main job when the runner is ready
-    runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
-    steps:
-      - name: Hello World
-        run: echo 'Hello World!'
-
-  stop-runner:
-    name: Stop self-hosted EC2 runner
-    needs:
-      - start-runner # required to get output from the start-runner job
-      - do-the-job # required to wait when the main job is done
-    runs-on: ubuntu-latest
-    if: ${{ always() }} # required to stop the runner even if the error happened in the previous jobs
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
         with:
-          role-to-assume: arn:aws:iam::909785973729:role/actions-agent
-          aws-region: us-east-1
+          terraform_version: 1.8.1
 
-      - name: Stop EC2 runner
-        uses: machulav/ec2-github-runner@v2
-        with:
-          mode: stop
-          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          label: ${{ needs.start-runner.outputs.label }}
-          ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}
+      - name: Terraform Format Check
+        working-directory: test/integration
+        id: fmt
+        run: terraform fmt -check
+
+      - name: Terraform Init
+        working-directory: test/integration
+        id: init
+        run: |
+          aws sts get-caller-identity --profile rerun_dev
+          git config --global url."https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com".insteadOf ssh://git@github.com
+          terraform init -upgrade
+
+      - name: Terraform Workspace New
+        working-directory: test/integration
+        id: workspace-new
+        run: terraform workspace new "pr-${{ inputs.pr }}"
+        continue-on-error: true
+
+      # workspace new switches to the new workspace but we want to select it and fail if we can't for whatever reason
+      - name: Terraform Workspace Select
+        working-directory: test/integration
+        id: workspace-select
+        run: terraform workspace select "pr-${{ inputs.pr }}"
+
+      - name: Terraform Validate
+        working-directory: test/integration
+        id: validate
+        run: terraform validate -no-color
+
+      - name: Terraform Apply
+        id: apply
+        working-directory: test/integration
+        run: terraform apply -auto-approve -input=false
+
