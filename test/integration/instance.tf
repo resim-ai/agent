@@ -59,31 +59,49 @@ resource "aws_instance" "test_agent" {
               #!/bin/bash
               # Setup Cloudwatch
               yum update -y
-              yum install -y awslogs amazon-cloudwatch-agent
-              cat <<EOC > /etc/awslogs/awslogs.conf
-                  [general]
-                  state_file = /var/lib/awslogs/agent-state
-                  use_gzip_http_content_encoding = true
-                  [/var/log/messages]
-                  log_group_name = agent_testing
-                  log_stream_name = /ec2/{instance_id}/var/log/messages
-                  file = /var/log/messages
-                  datetime_format = %Y-%m-%d %H:%M:%S
-                  buffer_duration = 5000
-                  initial_position = start_of_file
-                  [/opt/application/server.log]
-                  log_group_name = agent_testing
-                  log_stream_name = /ec2/{instance_id}/opt/application/server.log
-                  file = /opt/application/server.log
-                  datetime_format = %Y-%m-%d %H:%M:%S
-                  initial_position = start_of_file
-                  time_zone = UTC
-                  encoding = utf_8
-                  buffer_duration = 5000
+              yum install -y amazon-cloudwatch-agent
+              cat <<EOC > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+  {
+      "agent": {
+        "logfile": "/opt/aws/amazon-cloudwatch-agent/logs/amazon-cloudwatch-agent.log"
+      },
+      "logs": {
+        "logs_collected": {
+          "files": {
+            "collect_list": [
+              {
+                "file_path": "/opt/aws/amazon-cloudwatch-agent/logs/amazon-cloudwatch-agent.log",
+                "log_group_name": "/ec2/CloudWatchAgentLog/",
+                "log_stream_name": "agent/{instance_id}_{hostname}",
+                "timezone": "Local"
+              },
+              {
+                "file_path": "/var/log/messages",
+                "log_group_name":  "/ec2/var/log/messages",
+                "log_stream_name": "agent/{instance_id}_{hostname}",
+                "timezone": "Local"
+              },
+              {
+                "file_path": "/var/log/secure",
+                "log_group_name":  "/ec2/var/log/secure",
+                "log_stream_name": "agent/{instance_id}_{hostname}",
+                "timezone": "Local"
+              },
+              {
+                "file_path": "/var/log/yum.log",
+                "log_group_name":  "/ec2/var/log/yum",
+                "log_stream_name": "agent/{instance_id}_{hostname}",
+                "timezone": "Local"
+              }
+            ]
+          }
+        },
+		"log_stream_name": "/ec2/catchall"
+      }
+    }
               EOC
 
-              systemctl start awslogsd
-              systemctl enable awslogsd.service
+              /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
 
               # Download and install the agent
               wget https://resim-binaries.s3.amazonaws.com/agent/agent-linux-amd64-${terraform.workspace} -O /usr/local/bin/agent
