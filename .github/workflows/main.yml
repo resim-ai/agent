@@ -65,5 +65,7 @@ jobs:
   integration_tests:
     name: Run intergration tests
     uses: ./.github/workflows/integration-tests.yml
+    secrets:
+      GH_PERSONAL_ACCESS_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
 
 # TODO: Once the repo is public, also repeat tests with `go install` as well as binary download

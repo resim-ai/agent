@@ -2,6 +2,9 @@
 name: Run integration tests
 on:  #trunk-ignore(yamllint/truthy)
   workflow_call:
+    secrets:
+      GH_PERSONAL_ACCESS_TOKEN:
+        required: true
 jobs:
   start-runner:
     name: Start self-hosted EC2 runner
