@@ -62,5 +62,8 @@ jobs:
       private-key: ${{ secrets.DEPLOYMENT_BOT_PRIVATE_KEY }}
 
 # TODO: Integration test https://app.asana.com/0/1207977581994839/1208362865864394/f
+  integration_tests:
+    name: Run intergration tests
+    uses: ./.github/workflows/integration-tests.yml
 
 # TODO: Once the repo is public, also repeat tests with `go install` as well as binary download
