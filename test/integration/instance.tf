@@ -43,6 +43,29 @@ data "aws_ssm_parameter" "ecs_optimized_ami" {
   name = "/aws/service/ecs/optimized-ami/amazon-linux-2023/recommended"
 }
 
+data "template_cloudinit_config" "config" {
+  base64_encode = true
+
+  part {
+    filename     = "cloud-config.yaml"
+    content_type = "text/cloud-config"
+    content = templatefile(
+      "${path.module}/templates/cloud-config.yaml.tftpl",
+      {
+        auth_host      = "https://resim-dev.us.auth0.com"
+        api_host       = "https://dev-env-pr-1269.agentapi.dev.resim.io/agent/v1"
+        pool_labels    = "ec2-small"
+        agent_name     = "barry"
+        agent_version  = terraform.workspace
+        agent_username = "e2e.resim.ai"
+        agent_password = var.agent_password
+
+        cloudwatch_agent_config = filebase64("${path.module}/templates/amazon-cloudwatch-agent.json")
+      }
+    )
+  }
+}
+
 resource "aws_instance" "test_agent" {
   ami             = jsondecode(data.aws_ssm_parameter.ecs_optimized_ami.value)["image_id"]
   instance_type   = "t2.micro"
@@ -55,69 +78,7 @@ resource "aws_instance" "test_agent" {
     Name = "agent-test"
   }
 
-  user_data = <<-EOF
-              #!/bin/bash
-              # Setup Cloudwatch
-              yum update -y
-              yum install -y amazon-cloudwatch-agent
-              cat <<EOC > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
-  {
-      "agent": {
-        "logfile": "/opt/aws/amazon-cloudwatch-agent/logs/amazon-cloudwatch-agent.log"
-      },
-      "logs": {
-        "logs_collected": {
-          "files": {
-            "collect_list": [
-              {
-                "file_path": "/opt/aws/amazon-cloudwatch-agent/logs/amazon-cloudwatch-agent.log",
-                "log_group_name": "/ec2/CloudWatchAgentLog/",
-                "log_stream_name": "agent/{instance_id}_{hostname}",
-                "timezone": "Local"
-              },
-              {
-                "file_path": "/var/log/messages",
-                "log_group_name":  "/ec2/var/log/messages",
-                "log_stream_name": "agent/{instance_id}_{hostname}",
-                "timezone": "Local"
-              },
-              {
-                "file_path": "/var/log/secure",
-                "log_group_name":  "/ec2/var/log/secure",
-                "log_stream_name": "agent/{instance_id}_{hostname}",
-                "timezone": "Local"
-              },
-              {
-                "file_path": "/var/log/yum.log",
-                "log_group_name":  "/ec2/var/log/yum",
-                "log_stream_name": "agent/{instance_id}_{hostname}",
-                "timezone": "Local"
-              }
-            ]
-          }
-        },
-		"log_stream_name": "/ec2/catchall"
-      }
-    }
-              EOC
-
-              /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
-
-              # Download and install the agent
-              wget https://resim-binaries.s3.amazonaws.com/agent/agent-linux-amd64-${terraform.workspace} -O /usr/local/bin/agent
-              chmod +x /usr/local/bin/agent
-
-              # Set env vars
-              export RERUN_AGENT_AUTH_HOST=https://resim-dev.us.auth0.com
-              export RERUN_AGENT_API_HOST=https://dev-env-pr-1269.agentapi.dev.resim.io/agent/v1
-              export RERUN_AGENT_NAME=barry
-              export RERUN_AGENT_POOL_LABELS=ec2-small
-              export RERUN_AGENT_USERNAME=e2e.resim.ai
-              export RERUN_AGENT_PASSWORD=${var.agent_password}
-
-              # Start the agent
-              nohup agent &
-              EOF
+  user_data = data.template_cloudinit_config.config.rendered
 }
 
 resource "aws_iam_policy" "this" {
