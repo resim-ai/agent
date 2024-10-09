@@ -25,3 +25,4 @@ agent
 
 # Terraform
 .terraform
+test/integration/.terraform.lock.hcl
