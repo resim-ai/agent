@@ -11,7 +11,8 @@ write_files:
    content: ${cloudwatch_agent_config}
 
 packages:
- - amazon-cloudwatch-agent
+  - amazon-cloudwatch-agent
+  - wget
 
 runcmd:
   - /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
