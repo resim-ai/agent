@@ -3,16 +3,27 @@
 repo_update: true
 repo_upgrade: all
 
-write_files:
- - encoding: b64
-   path: /opt/aws/amazon-cloudwatch-agent/logs/amazon-cloudwatch-agent.log
-   owner: root:root
-   permissions: '0644'
-   content: ${cloudwatch_agent_config}
-
 packages:
   - amazon-cloudwatch-agent
   - wget
+
+write_files:
+  - encoding: b64
+    path: /opt/aws/amazon-cloudwatch-agent/logs/amazon-cloudwatch-agent.log
+    owner: root:root
+    permissions: '0644'
+    content: ${cloudwatch_agent_config}
+  - path: /resim/config
+    owner: root:root
+    permissions: '0644'
+    content: |
+      auth-host: ${auth_host}
+      api-host: ${api_host}
+      name: ${agent_name}
+      pool-labels:
+        - ${pool_labels}
+      username: ${agent_username}
+      password: ${agent_password}
 
 runcmd:
   - /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
@@ -20,14 +31,6 @@ runcmd:
     # Download and install the agent
     aws s3 cp s3://resim-binaries/agent/agent-linux-amd64-pr-6 /usr/local/bin/agent
     chmod +x /usr/local/bin/agent
-
-    # Set env vars
-    export RERUN_AGENT_AUTH_HOST=${auth_host}
-    export RERUN_AGENT_API_HOST=${api_host}
-    export RERUN_AGENT_NAME=${agent_name}
-    export RERUN_AGENT_POOL_LABELS=${pool_labels}
-    export RERUN_AGENT_USERNAME=${agent_username}
-    export RERUN_AGENT_PASSWORD=${agent_password}
 
     # Start the agent
     nohup agent &
