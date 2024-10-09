@@ -29,8 +29,8 @@
           },
           {
             "file_path": "/resim/agent.log",
-            "log_group_name": "/resim",
-            "log_stream_name": "{instance_id}_{hostname}",
+            "log_group_name": "/agent-integration-tests/",
+            "log_stream_name": "/resim/{instance_id}_{hostname}",
             "timezone": "Local",
             "retention_in_days": 7
           }
