@@ -13,6 +13,15 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    cloudinit = {
+      source  = "hashicorp/cloudinit"
+      version = "~> 2.0"
+    }
+    # FIXME: Remove this after the resource has been updated
+    template = {
+      source  = "hashicorp/template"
+      version = "2.2.0"
+    }
   }
 }
 
