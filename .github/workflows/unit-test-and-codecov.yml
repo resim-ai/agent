@@ -53,7 +53,7 @@ jobs:
 
       - name: Build Go
         if: steps.go-build-cache.outputs.cache-hit != 'true'
-        run: go build -o ./agent-linux-amd64-${{ steps.extract_pr.outputs.PR_NUMBER }} -buildvcs=false .
+        run: go build -o ./agent-linux-amd64-${{ steps.extract_pr.outputs.PR_NUMBER }} -buildvcs=false ./cmd
         env:
           PR_NUMBER: ${{ steps.extract_pr.outputs.PR_NUMBER }}
 
