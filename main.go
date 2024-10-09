@@ -131,11 +131,11 @@ func Start(a Agent) {
 
 		task := a.getTask()
 		if task.TaskName == nil {
-			fmt.Println("no task found")
+			slog.Info("No task found. Snoozing...")
 			time.Sleep(20 * time.Second)
 			continue
 		}
-		fmt.Println("task name", task.TaskName)
+		slog.Info("Task found, starting work", "task name", task.TaskName)
 		taskStateChan <- taskStatusMessage{
 			Name:   *task.TaskName,
 			Status: api.STARTING,
@@ -186,7 +186,7 @@ func GetConfigDir() (string, error) {
 	if _, err := os.Stat(expectedDir); os.IsNotExist(err) {
 		err := os.Mkdir(expectedDir, 0o700)
 		if err != nil {
-			log.Println("error creating directory:", err)
+			slog.Error("Error creating directory")
 			return "", err
 		}
 	}
@@ -201,7 +201,7 @@ func (a Agent) getTask() api.TaskPollOutput {
 		PoolLabels: a.PoolLabels,
 	})
 	if err != nil {
-		slog.Error("error polling for task", "err", err)
+		slog.Error("Error polling for task", "err", err)
 	}
 	if pollResponse.StatusCode() == 204 {
 		slog.Debug("No task available")
