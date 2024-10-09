@@ -85,25 +85,43 @@ resource "aws_iam_policy" "this" {
   name        = "agent-test-cloudwatch-${terraform.workspace}"
   description = "EC2 CloudWatch Agent Policy for Agent Test"
 
-  policy = <<EOF
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Action": [
-                "logs:CreateLogGroup",
-                "logs:CreateLogStream",
-                "logs:PutLogEvents",
-                "logs:DescribeLogStreams"
-            ],
-            "Resource": [
-                "arn:aws:logs:*:*:*"
-            ]
-        }
-    ]
+  policy = data.aws_iam_policy_document.this.json
 }
-EOF
+
+data "aws_iam_policy_document" "this" {
+  statement {
+    sid = "Cloudwatch"
+    actions = [
+      "logs:CreateLogGroup",
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+      "logs:DescribeLogStreams"
+    ]
+    resources = ["arn:aws:logs:*:*:*"]
+    effect    = "Allow"
+  }
+
+  statement {
+    sid = "AllowAgentCIToHead"
+    resources = [
+      "arn:aws:s3:::resim-binaries",
+      "arn:aws:s3:::resim-binaries/*",
+    ]
+    effect = "Allow"
+    actions = [
+      "s3:ListBucket",
+      "s3:GetObject",
+    ]
+  }
+
+  statement {
+    sid = "AgentCIRW"
+    resources = [
+      "arn:aws:s3:::resim-binaries/agent/*"
+    ]
+    effect  = "Allow"
+    actions = ["s3:*"]
+  }
 }
 
 resource "aws_iam_role" "this" {
