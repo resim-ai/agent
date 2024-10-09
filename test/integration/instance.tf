@@ -5,7 +5,7 @@ terraform {
     bucket  = "resim-terraform"
     key     = "infrastructure/agent_tests/terraform.tfstate"
     region  = "us-east-1"
-    profile = "infrastructure"
+    profile = "rerun_dev"
   }
 
   required_providers {
@@ -121,8 +121,8 @@ resource "aws_instance" "test_agent" {
 }
 
 resource "aws_iam_policy" "this" {
-  name        = "ec2_cloudwatch_policy"
-  description = "EC2 CloudWatch Agent Policy"
+  name        = "agent-test-cloudwatch-${terraform.workspace}"
+  description = "EC2 CloudWatch Agent Policy for Agent Test"
 
   policy = <<EOF
 {
@@ -146,7 +146,7 @@ EOF
 }
 
 resource "aws_iam_role" "this" {
-  name               = "EC2CloudWatchAccessRole"
+  name               = "agent-test-${terraform.workspace}"
   assume_role_policy = <<EOF
 {
  "Version": "2012-10-17",
@@ -165,18 +165,18 @@ EOF
 }
 
 resource "aws_iam_policy_attachment" "this" {
-  name       = "EC2CloudWatchAccessRoleAttachment"
+  name       = "agent-test-cloudwatch-${terraform.workspace}"
   roles      = [aws_iam_role.this.name]
   policy_arn = aws_iam_policy.this.arn
 }
 
 resource "aws_iam_policy_attachment" "ssm" {
-  name       = "EC2CloudWatchAccessSSM"
+  name       = "agent-test-ssm-${terraform.workspace}"
   roles      = [aws_iam_role.this.name]
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
 resource "aws_iam_instance_profile" "profile" {
-  name = "EC2CloudwatchInstanceProfile"
+  name = "agent-test-${terraform.workspace}"
   role = aws_iam_role.this.name
 }
