@@ -43,7 +43,7 @@ data "aws_ssm_parameter" "ecs_optimized_ami" {
   name = "/aws/service/ecs/optimized-ami/amazon-linux-2023/recommended"
 }
 
-data "template_cloudinit_config" "config" {
+data "cloudinit_config" "config" {
   base64_encode = true
 
   part {
@@ -78,7 +78,7 @@ resource "aws_instance" "test_agent" {
     Name = "agent-test"
   }
 
-  user_data = data.template_cloudinit_config.config.rendered
+  user_data = data.cloudinit_config.config.rendered
 }
 
 resource "aws_iam_policy" "this" {
