@@ -67,6 +67,11 @@ type Task api.TaskPollOutput
 // upload outputs
 
 func Start(a Agent) {
+	slogLevel := new(slog.LevelVar)
+	slog.SetDefault(
+		slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slogLevel})),
+	)
+
 	err := a.loadConfig()
 	if err != nil {
 		log.Fatal("error loading config", err)
