@@ -99,6 +99,7 @@ data "aws_iam_policy_document" "this" {
       "logs:CreateLogGroup",
       "logs:CreateLogStream",
       "logs:PutLogEvents",
+      "logs:PutRetentionPolicy",
       "logs:DescribeLogStreams"
     ]
     resources = ["arn:aws:logs:*:*:*"]

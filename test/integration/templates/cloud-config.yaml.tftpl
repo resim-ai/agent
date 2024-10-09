@@ -34,4 +34,4 @@ runcmd:
     chmod +x /usr/local/bin/agent
 
     # Start the agent
-    nohup agent &
+    nohup agent > /resim/agent.log 2>&1 &
