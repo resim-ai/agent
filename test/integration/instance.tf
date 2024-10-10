@@ -58,7 +58,7 @@ data "cloudinit_config" "config" {
       {
         auth_host      = "https://resim-dev.us.auth0.com"
         api_host       = "https://dev-env-pr-1269.agentapi.dev.resim.io/agent/v1"
-        pool_labels    = "ec2-small"
+        pool_labels    = "agent-test-${terraform.workspace}"
         agent_name     = "barry"
         agent_version  = terraform.workspace
         agent_username = "e2e.resim.ai"
