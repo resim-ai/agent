@@ -7,6 +7,8 @@ packages:
   - amazon-cloudwatch-agent
   - wget
   - rsyslog
+  - glibc
+  - docker
 
 write_files:
   - encoding: b64
@@ -28,6 +30,8 @@ write_files:
 
 runcmd:
   - /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+  - sudo usermod -a -G docker ec2-user
+  - sudo service docker start
   - |
     # Download and install the agent
     aws s3 cp s3://resim-binaries/agent/agent-linux-amd64-pr-6 /usr/local/bin/agent

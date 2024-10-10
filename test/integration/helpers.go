@@ -248,7 +248,7 @@ func (s *AgentTestSuite) createMetricsBuild() {
 		slog.Error("Unable to create metrics build", "error", err)
 		os.Exit(1)
 	}
-	s.metricsBuildID = *&createMetricsBuildResponse.JSON201.MetricsBuildID
+	s.metricsBuildID = createMetricsBuildResponse.JSON201.MetricsBuildID
 }
 
 func (s *AgentTestSuite) createTestExperience() {

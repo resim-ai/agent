@@ -43,8 +43,8 @@ variable "agent_password" {
   type = string
 }
 
-data "aws_ssm_parameter" "ecs_optimized_ami" {
-  name = "/aws/service/ecs/optimized-ami/amazon-linux-2023/recommended"
+data "aws_ssm_parameter" "ami" {
+  name = "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-ebs"
 }
 
 data "cloudinit_config" "config" {
@@ -71,7 +71,7 @@ data "cloudinit_config" "config" {
 }
 
 resource "aws_instance" "test_agent" {
-  ami             = jsondecode(data.aws_ssm_parameter.ecs_optimized_ami.value)["image_id"]
+  ami             = "ami-040ff65cdc7e40806"
   instance_type   = "t2.micro"
   subnet_id       = "subnet-068480ff23a430b87"
   security_groups = ["sg-02994ab0d8a58f1dc"]
