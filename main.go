@@ -30,15 +30,6 @@ const (
 	agentStatusError    agentStatus = "ERROR"
 )
 
-// type taskStatus string
-
-// const (
-// 	taskStatusRunning   taskStatus = "RUNNING"
-// 	taskStatusStarting  taskStatus = "STARTING"
-// 	taskStatusError     taskStatus = "ERROR"
-// 	taskStatusSucceeded taskStatus = "SUCCEEDED"
-// )
-
 type taskStatusMessage struct {
 	Name   string
 	Status api.TaskStatus
@@ -61,10 +52,6 @@ type Agent struct {
 }
 
 type Task api.TaskPollOutput
-
-// TODO
-// set up volumes
-// upload outputs
 
 func (a Agent) Start() error {
 	err := a.LoadConfig()
@@ -211,16 +198,17 @@ func (a Agent) getTask() api.TaskPollOutput {
 		slog.Error("error polling for task", "err", err)
 	}
 
-	// handle a 400 gracefully here
-
 	if pollResponse.StatusCode() == 204 {
-		slog.Debug("No task available")
+		// slog.Debug("No task available")
 		return api.TaskPollOutput{}
 	}
 
-	task := pollResponse.JSON200
+	if pollResponse.StatusCode() == 200 {
+		task := pollResponse.JSON200
+		return *task
+	}
 
-	return *task
+	return api.TaskPollOutput{}
 }
 
 func StringifyEnvironmentVariables(inputVars [][]string) []string {
@@ -235,18 +223,8 @@ func StringifyEnvironmentVariables(inputVars [][]string) []string {
 func (a Agent) runWorker(ctx context.Context, task Task, taskStateChan chan taskStatusMessage) error {
 	providedEnvVars := StringifyEnvironmentVariables(*task.WorkerEnvironmentVariables)
 	extraEnvVars := []string{
-		"RERUN_WORKER_SHARED_MEMORY_MB=64",
 		"RERUN_WORKER_ENVIRONMENT=dev",
-		"RERUN_WORKER_GPU_COUNT=0",
-		// TODO get the above from API
-		"RERUN_WORKER_S3_ROLE_ARN=foo",
-		// The above should be optional once the worker changes are in
 	}
-
-	// tmpDir, err := os.MkdirTemp("", fmt.Sprintf("resim-%v-*", *task.TaskName))
-	// if err != nil {
-	// 	slog.Error("Error creating tmp file", "err", err)
-	// }
 
 	config := &container.Config{
 		Image: *task.WorkerImageURI,
@@ -263,8 +241,7 @@ func (a Agent) runWorker(ctx context.Context, task Task, taskStateChan chan task
 					Target: "/var/run/docker.sock",
 				},
 				{
-					Type: mount.TypeBind,
-					// Source: tmpDir,
+					Type:   mount.TypeBind,
 					Source: "/tmp/resim",
 					Target: "/tmp/resim",
 				},
