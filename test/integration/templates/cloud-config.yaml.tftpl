@@ -2,11 +2,20 @@
 
 repo_update: true
 repo_upgrade: all
+apt:
+  preserve_sources_list: true
+  sources:
+    docker.list:
+      keyid: 9DC858229FC7DD38854AE2D88D81803C0EBFCD88
+      source: deb [arch=amd64] https://download.docker.com/linux/ubuntu jammy stable
 
 packages:
-  - amazon-cloudwatch-agent
+  - awscli
   - wget
   - rsyslog
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
 
 write_files:
   - encoding: b64
@@ -27,6 +36,8 @@ write_files:
       password: ${agent_password}
 
 runcmd:
+  - wget https://s3.amazonaws.com/amazoncloudwatch-agent/debian/amd64/latest/amazon-cloudwatch-agent.deb
+  - dpkg -i -E ./amazon-cloudwatch-agent.deb
   - /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
   - |
     # Download and install the agent
