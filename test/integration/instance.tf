@@ -174,7 +174,7 @@ resource "aws_s3_bucket_public_access_block" "experiences" {
 }
 
 resource "aws_s3_bucket" "experiences" {
-  bucket = "agent-test-${terraform.workspace}"
+  bucket = "resim-agent-test-${terraform.workspace}"
 
   force_destroy = true
 }
