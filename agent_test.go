@@ -1,12 +1,21 @@
-package agent
+package agent_test
 
 import (
 	"log"
 	"os"
 	"testing"
 
+	"github.com/resim-ai/agent"
 	"github.com/stretchr/testify/suite"
 )
+
+const defaultTestConfig = `api-host: https://api.resim.ai/worker/v1
+name: my-forklift
+pool-labels:
+  - small
+  - big
+username: gimli
+password: hunter2`
 
 type AgentTestSuite struct {
 	suite.Suite
@@ -16,13 +25,24 @@ func TestAgentSuite(s *testing.T) {
 	suite.Run(s, new(AgentTestSuite))
 }
 
-func (s *AgentTestSuite) TestStringifyEnvironmentVariables() {
-	inputVars := map[string]string{
-		"RERUN_WORKER_FOO": "bar",
-		"RERUN_WORKER_BAR": "foo",
+func createConfigFile() string {
+	f, err := os.CreateTemp("/tmp", "config.yaml")
+	if err != nil {
+		log.Fatal("error creating temp file")
 	}
 
-	outputVars := stringifyEnvironmentVariables(inputVars)
+	f.WriteString(defaultTestConfig)
+
+	return f.Name()
+}
+
+func (s *AgentTestSuite) TestStringifyEnvironmentVariables() {
+	inputVars := [][]string{
+		{"RERUN_WORKER_FOO", "bar"},
+		{"RERUN_WORKER_BAR", "foo"},
+	}
+
+	outputVars := agent.StringifyEnvironmentVariables(inputVars)
 
 	s.ElementsMatch([]string{
 		"RERUN_WORKER_FOO=bar",
@@ -31,27 +51,37 @@ func (s *AgentTestSuite) TestStringifyEnvironmentVariables() {
 }
 
 func (s *AgentTestSuite) TestLoadConfigFile() {
-	f, err := os.CreateTemp("/tmp", "config.yaml")
-	if err != nil {
-		log.Fatal("error creating temp file")
+	configFile := createConfigFile()
+	defer os.Remove(configFile)
+
+	a := agent.Agent{
+		ConfigFileOverride: configFile,
 	}
-	defer os.Remove(f.Name())
 
-	testConfig := `api-host: https://api.resim.ai/worker/v1
-name: my-forklift
-pool-labels:
-  - small
-  - big
-username: gimli
-password: hunter2`
-
-	f.WriteString(testConfig)
-
-	a := Agent{
-		ConfigFileOverride: f.Name(),
-	}
-	a.loadConfig()
+	err := a.LoadConfig()
+	s.NoError(err)
 
 	s.Equal("https://api.resim.ai/worker/v1", a.APIHost)
 	s.Equal("my-forklift", a.Name)
+}
+
+func (s *AgentTestSuite) TestInvalidConfig() {
+	a := agent.Agent{
+		ConfigFileOverride: "/not/real/path/",
+	}
+
+	err := a.Start()
+
+	s.Error(err)
+}
+
+func (s *AgentTestSuite) TestInvalidDockerClient() {
+	os.Setenv("DOCKER_HOST", "1.2.3.4:1234")
+
+	a := agent.Agent{}
+
+	err := a.Start()
+	s.Error(err)
+
+	os.Unsetenv("DOCKER_HOST")
 }
