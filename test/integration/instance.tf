@@ -43,8 +43,19 @@ variable "agent_password" {
   type = string
 }
 
-data "aws_ssm_parameter" "ami" {
-  name = "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-ebs"
+data "aws_ami" "this" {
+  most_recent = true
+  owners      = ["099720109477"] # Canonical
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
 }
 
 data "cloudinit_config" "config" {
@@ -71,7 +82,7 @@ data "cloudinit_config" "config" {
 }
 
 resource "aws_instance" "test_agent" {
-  ami             = "ami-040ff65cdc7e40806"
+  ami             = data.aws_ami.this.id
   instance_type   = "t2.micro"
   subnet_id       = "subnet-068480ff23a430b87"
   security_groups = ["sg-02994ab0d8a58f1dc"]
