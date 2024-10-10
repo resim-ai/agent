@@ -190,7 +190,7 @@ func GetConfigDir() (string, error) {
 func (a Agent) getTask() api.TaskPollOutput {
 	ctx := context.Background()
 
-	pollResponse, err := a.ApiClient.TaskPollWithResponse(ctx, api.TaskPollInput{
+	pollResponse, err := a.APIClient.TaskPollWithResponse(ctx, api.TaskPollInput{
 		AgentID:    a.Name,
 		PoolLabels: a.PoolLabels,
 	})
@@ -312,7 +312,7 @@ func (a *Agent) startHeartbeat(ctx context.Context) error {
 				hbInput.TaskStatus = &a.CurrentTaskStatus
 			}
 
-			_, err := a.ApiClient.AgentHeartbeat(ctx, hbInput)
+			_, err := a.APIClient.AgentHeartbeat(ctx, hbInput)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -326,7 +326,7 @@ func (a *Agent) startHeartbeat(ctx context.Context) error {
 func (a *Agent) updateTaskStatus(ctx context.Context, taskName string, status api.TaskStatus) error {
 	slog.Info("Updating task status", "task_name", taskName, "status", status)
 
-	_, err := a.ApiClient.UpdateTask(ctx, taskName, api.UpdateTaskInput{
+	_, err := a.APIClient.UpdateTask(ctx, taskName, api.UpdateTaskInput{
 		Status: &status,
 	})
 
