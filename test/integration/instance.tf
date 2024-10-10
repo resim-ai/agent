@@ -162,3 +162,48 @@ resource "aws_iam_instance_profile" "profile" {
   name = "agent-test-${terraform.workspace}"
   role = aws_iam_role.this.name
 }
+
+
+resource "aws_s3_bucket_public_access_block" "experiences" {
+  bucket = aws_s3_bucket.experiences.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket" "experiences" {
+  bucket = "agent-test-${terraform.workspace}"
+
+  force_destroy = true
+}
+
+data "aws_iam_policy_document" "resim" {
+
+  statement {
+    sid       = "ReSim-ReadWrite"
+    effect    = "Allow"
+    resources = [aws_s3_bucket.experiences.arn]
+
+    actions = [
+      "s3:*"
+    ]
+
+    principals {
+      type        = "AWS"
+      identifiers = ["*"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:PrincipalOrgID"
+      values   = ["o-nz0682unft"]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "experiences" {
+  bucket = aws_s3_bucket.experiences.id
+  policy = data.aws_iam_policy_document.resim.json
+}
