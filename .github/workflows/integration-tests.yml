@@ -89,3 +89,56 @@ jobs:
         working-directory: test/integration
         run: terraform apply -auto-approve -input=false
 
+  # stop_instance:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v3
+  #
+  #     - name: Generate Deployment Bot token
+  #       id: generate_token
+  #       uses: actions/create-github-app-token@v1
+  #       with:
+  #         app-id: ${{ secrets.DEPLOYMENT_BOT_APP_ID }}
+  #         private-key: ${{ secrets.DEPLOYMENT_BOT_PRIVATE_KEY }}
+  #         owner: ${{ github.repository_owner }}
+  #         repositories: agent
+  #
+  #     - name: Configure AWS Credentials - rerun_dev
+  #       uses: aws-actions/configure-aws-credentials@v4
+  #       with:
+  #         role-to-assume: arn:aws:iam::840213157818:role/actions-agent
+  #         aws-region: us-east-1
+  #
+  #     - name: Setup AWS Profile - rerun_dev
+  #       run: |
+  #         aws configure set region us-east-1 --profile rerun_dev
+  #         aws configure set aws_access_key_id ${{ env.AWS_ACCESS_KEY_ID }} --profile rerun_dev
+  #         aws configure set aws_secret_access_key ${{ env.AWS_SECRET_ACCESS_KEY }} --profile rerun_dev
+  #         aws configure set aws_session_token ${{ env.AWS_SESSION_TOKEN }} --profile rerun_dev
+  #         aws configure list --profile rerun_dev
+  #         aws sts get-caller-identity --profile rerun_dev
+  #
+  #     - name: Setup Terraform
+  #       uses: hashicorp/setup-terraform@v2
+  #       with:
+  #         terraform_version: 1.8.1
+  #
+  #     - name: Terraform Init
+  #       working-directory: test/integration
+  #       id: init
+  #       run: |
+  #         aws sts get-caller-identity --profile rerun_dev
+  #         git config --global url."https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com".insteadOf ssh://git@github.com
+  #         terraform init
+  #
+  #     # workspace new switches to the new workspace but we want to select it and fail if we can't for whatever reason
+  #     - name: Terraform Workspace Select
+  #       working-directory: test/integration
+  #       id: workspace-select
+  #       run: terraform workspace select "pr-${{ inputs.pr }}"
+  #
+  #     - name: Terraform Destroy
+  #       working-directory: test/integration
+  #       run: terraform apply -destroy -auto-approve -input=false
+  #
