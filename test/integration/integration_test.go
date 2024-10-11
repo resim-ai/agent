@@ -20,7 +20,6 @@ func (s *AgentTestSuite) SetupTest() {
 	s.buildIDLocal = s.createBuild(viper.GetViper().GetString(LocalImageKey))
 	s.createMetricsBuild()
 	s.createS3TestExperience()
-	s.createS3TestExperience()
 	s.createLocalTestExperiences()
 }
 
