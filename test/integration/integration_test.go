@@ -19,8 +19,6 @@ func (s *AgentTestSuite) SetupTest() {
 	s.buildIDS3 = s.createBuild("public.ecr.aws/docker/library/hello-world:latest")
 	s.buildIDLocal = s.createBuild(viper.GetViper().GetString(LocalImageKey))
 	s.createMetricsBuild()
-	s.createS3TestExperience()
-	s.createLocalTestExperiences()
 }
 
 func TestAgentTestSuite(t *testing.T) {
@@ -48,6 +46,7 @@ func TestAgentTestSuite(t *testing.T) {
 
 // Test the agent with a batch where the experiences are in S3
 func (s *AgentTestSuite) TestAgentWithS3Experience() {
+	s.createS3TestExperience()
 	batch := s.createAndAwaitBatch(s.buildIDS3, s.s3Experiences)
 	jobsResponse, err := s.APIClient.ListJobsWithResponse(
 		context.Background(),
@@ -87,6 +86,7 @@ func (s *AgentTestSuite) TestAgentWithS3Experience() {
 
 // Test the agent with a batch where the experiences are baked into the image
 func (s *AgentTestSuite) TestAgentWithLocalExperience() {
+	s.createLocalTestExperiences()
 	batch := s.createAndAwaitBatch(s.buildIDLocal, s.localExperiences)
 	jobsResponse, err := s.APIClient.ListJobsWithResponse(
 		context.Background(),
