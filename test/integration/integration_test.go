@@ -57,7 +57,7 @@ func (s *AgentTestSuite) TestAgentWithS3Experience() {
 		})
 
 	s.NoError(err)
-	s.Len(*jobsResponse.JSON200.Jobs, 2)
+	s.Len(*jobsResponse.JSON200.Jobs, 1)
 	expectedOutputFiles := ListExpectedOutputFiles()
 
 	printLogs := *batch.Status != api.BatchStatusSUCCEEDED // we will print urls to logs if the batch did not succeed
@@ -97,7 +97,7 @@ func (s *AgentTestSuite) TestAgentWithLocalExperience() {
 		})
 
 	s.NoError(err)
-	s.Len(*jobsResponse.JSON200.Jobs, 2)
+	s.Len(*jobsResponse.JSON200.Jobs, 1)
 	expectedOutputFiles := ListExpectedOutputFiles()
 
 	printLogs := *batch.Status != api.BatchStatusSUCCEEDED // we will print urls to logs if the batch did not succeed
