@@ -11,7 +11,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.0"
+      version = "~> 5.70" # TODO: Unpin minor version when it's not broken
     }
     cloudinit = {
       source  = "hashicorp/cloudinit"

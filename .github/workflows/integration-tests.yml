@@ -221,6 +221,7 @@ jobs:
 
   stop_instance:
     name: Stop test environment
+    needs: [test]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
