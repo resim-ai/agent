@@ -98,7 +98,7 @@ resource "aws_instance" "test_agent" {
 
 resource "aws_iam_policy" "this" {
   name        = "agent-test-cloudwatch-${terraform.workspace}"
-  description = "EC2 CloudWatch Agent Policy for Agent Test"
+  description = "Agent Test"
 
   policy = data.aws_iam_policy_document.this.json
 }
@@ -134,6 +134,16 @@ data "aws_iam_policy_document" "this" {
     sid = "AgentCIRW"
     resources = [
       "arn:aws:s3:::resim-binaries/agent/*"
+    ]
+    effect  = "Allow"
+    actions = ["s3:*"]
+  }
+
+  statement {
+    sid = "Experiences"
+    resources = [
+      aws_s3_bucket.experiences.arn,
+      "${aws_s3_bucket.experiences.arn}/*",
     ]
     effect  = "Allow"
     actions = ["s3:*"]
