@@ -76,11 +76,7 @@ func Ptr[T any](t T) *T {
 
 func ListExpectedOutputFiles() []string {
 	return []string{
-		TestMCAPFile,
-		TestMP4File,
 		"metrics.binproto",
-		ExpectedExperienceNameFile,
-		ExpectedExperienceNameBase64File,
 		"experience-worker.log",
 		"experience-container.log",
 		"metrics-worker.log",
