@@ -28,6 +28,13 @@
             "retention_in_days": 7
           },
           {
+            "file_path": "/var/lib/docker/containers/**/*.log",
+            "log_group_name": "/agent-integration-tests/",
+            "log_stream_name": "/docker/{instance_id}_{hostname}",
+            "timezone": "Local",
+            "retention_in_days": 7
+          },
+          {
             "file_path": "/resim/agent.log",
             "log_group_name": "/agent-integration-tests/",
             "log_stream_name": "/resim/{instance_id}_{hostname}",

@@ -1,5 +1,5 @@
 ---
-name: Run integration tests
+name: Integration tests
 on:  #trunk-ignore(yamllint/truthy)
   workflow_call:
     secrets:
@@ -9,6 +9,8 @@ on:  #trunk-ignore(yamllint/truthy)
         required: true
       agent_password:
         required: true
+      AGENT_TEST_PASSWORD:
+        required: true
     inputs:
       pr:
         description: PR number
@@ -16,7 +18,8 @@ on:  #trunk-ignore(yamllint/truthy)
         type: number
 
 jobs:
-  start-instance:
+  start_instance:
+    name: Start test environment
     runs-on: ubuntu-latest
     env:
       TF_VAR_agent_password: "${{ secrets.agent_password }}"
@@ -89,56 +92,184 @@ jobs:
         working-directory: test/integration
         run: terraform apply -auto-approve -input=false
 
-  # stop_instance:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v3
-  #
-  #     - name: Generate Deployment Bot token
-  #       id: generate_token
-  #       uses: actions/create-github-app-token@v1
-  #       with:
-  #         app-id: ${{ secrets.DEPLOYMENT_BOT_APP_ID }}
-  #         private-key: ${{ secrets.DEPLOYMENT_BOT_PRIVATE_KEY }}
-  #         owner: ${{ github.repository_owner }}
-  #         repositories: agent
-  #
-  #     - name: Configure AWS Credentials - rerun_dev
-  #       uses: aws-actions/configure-aws-credentials@v4
-  #       with:
-  #         role-to-assume: arn:aws:iam::840213157818:role/actions-agent
-  #         aws-region: us-east-1
-  #
-  #     - name: Setup AWS Profile - rerun_dev
-  #       run: |
-  #         aws configure set region us-east-1 --profile rerun_dev
-  #         aws configure set aws_access_key_id ${{ env.AWS_ACCESS_KEY_ID }} --profile rerun_dev
-  #         aws configure set aws_secret_access_key ${{ env.AWS_SECRET_ACCESS_KEY }} --profile rerun_dev
-  #         aws configure set aws_session_token ${{ env.AWS_SESSION_TOKEN }} --profile rerun_dev
-  #         aws configure list --profile rerun_dev
-  #         aws sts get-caller-identity --profile rerun_dev
-  #
-  #     - name: Setup Terraform
-  #       uses: hashicorp/setup-terraform@v2
-  #       with:
-  #         terraform_version: 1.8.1
-  #
-  #     - name: Terraform Init
-  #       working-directory: test/integration
-  #       id: init
-  #       run: |
-  #         aws sts get-caller-identity --profile rerun_dev
-  #         git config --global url."https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com".insteadOf ssh://git@github.com
-  #         terraform init
-  #
-  #     # workspace new switches to the new workspace but we want to select it and fail if we can't for whatever reason
-  #     - name: Terraform Workspace Select
-  #       working-directory: test/integration
-  #       id: workspace-select
-  #       run: terraform workspace select "pr-${{ inputs.pr }}"
-  #
-  #     - name: Terraform Destroy
-  #       working-directory: test/integration
-  #       run: terraform apply -destroy -auto-approve -input=false
-  #
+  test:
+    name: Run test
+    runs-on: ubuntu-latest
+    needs: start_instance
+    outputs:
+      test_outcome: ${{ steps.test.outcome }}
+      test_report: ${{ steps.test-output.outputs.TEST_OUTPUT }}
+    steps:
+      - name: Generate Deployment Bot token
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.DEPLOYMENT_BOT_APP_ID }}
+          private-key: ${{ secrets.DEPLOYMENT_BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: agent,rerun
+
+      - name: Register Check In Progress
+        id: check-in-progress
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.generate_token.outputs.token }}
+          result-encoding: string
+          script: |
+            const response = await github.rest.checks.create({
+              owner: 'resim-ai',
+              repo: 'agent',
+              name: 'Agent Integration Test',
+              head_sha: '${{ github.sha }}',
+              status: 'in_progress',
+            })
+            return response.data.id
+
+      - name: Configure AWS Credentials - rerun_dev
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::840213157818:role/actions-agent
+          aws-region: us-east-1
+
+      - name: Setup AWS Profile - rerun_dev
+        run: |
+          aws configure set region us-east-1 --profile rerun_dev
+          aws configure set aws_access_key_id ${{ env.AWS_ACCESS_KEY_ID }} --profile rerun_dev
+          aws configure set aws_secret_access_key ${{ env.AWS_SECRET_ACCESS_KEY }} --profile rerun_dev
+          aws configure set aws_session_token ${{ env.AWS_SESSION_TOKEN }} --profile rerun_dev
+          aws configure list --profile rerun_dev
+          aws sts get-caller-identity --profile rerun_dev
+
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Build test
+        run: |
+          go get
+          go build ./test/integration
+
+      - name: Run End To End Test
+        id: test
+        run: go test -v ./test/integration >> test.out
+        env:
+          AWS_PROFILE: rerun_dev
+          AWS_REGION: us-east-1
+          AGENT_TEST_NAME: ci-integration-test-pr-${{ inputs.pr }}
+          AGENT_TEST_POOL_LABELS: agent-test-pr-${{ inputs.pr }}
+          AGENT_TEST_API_HOST: https://dev-env-pr-1269.api.dev.resim.io/v1/
+          AGENT_TEST_USERNAME: cli+e2e.resim.ai@resim.ai
+          AGENT_TEST_AUTH_HOST: https://resim-dev.us.auth0.com
+          AGENT_TEST_EXPERIENCE_BUCKET: resim-agent-test-pr-${{ inputs.pr }}
+          AGENT_TEST_PASSWORD: ${{ secrets.AGENT_TEST_PASSWORD }}
+        continue-on-error: true
+
+      - name: Get Test Output
+        id: test-output
+        if: always()
+        run: |
+          {
+            echo 'TEST_OUTPUT<<EOF'
+            awk 1 ORS='\n' < test.out
+            echo EOF
+          } > "$GITHUB_OUTPUT"
+
+      - name: Register Check Outcome
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.generate_token.outputs.token }}
+          script: |
+            github.rest.checks.update({
+              owner: 'resim-ai',
+              repo: 'agent',
+              name: 'Agent Integration Test',
+              check_run_id: ${{ steps.check-in-progress.outputs.result }},
+              status: 'completed',
+              conclusion: '${{ steps.test.outcome }}',
+            })
+
+  deployment_bot_comment_test:
+    name: Deployment Bot Comment - Test Complete
+    needs: [test]
+    uses: resim-ai/workflows/.github/workflows/create-update-deployment-bot-comment.yml@v2
+    with:
+      repository: rerun
+      pr_number: ${{ inputs.pr }}
+      ref_name: ${{ github.ref_name }}
+      comment_key: deploy-
+      comment_body: |
+        # End-to-end test results
+
+        ## Result 🧪 ${{ needs.test.outputs.test_outcome }}
+
+        <details><summary>Show Details</summary>
+
+        \`\`\`\n
+        ${{ needs.test.outputs.test_report }}
+        \`\`\`
+
+        </details>
+
+    secrets:
+      DEPLOYMENT_BOT_APP_ID: ${{ secrets.DEPLOYMENT_BOT_APP_ID }}
+      DEPLOYMENT_BOT_PRIVATE_KEY: ${{ secrets.DEPLOYMENT_BOT_PRIVATE_KEY }}
+
+  stop_instance:
+    name: Stop test environment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Generate Deployment Bot token
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.DEPLOYMENT_BOT_APP_ID }}
+          private-key: ${{ secrets.DEPLOYMENT_BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: agent
+
+      - name: Configure AWS Credentials - rerun_dev
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::840213157818:role/actions-agent
+          aws-region: us-east-1
+
+      - name: Setup AWS Profile - rerun_dev
+        run: |
+          aws configure set region us-east-1 --profile rerun_dev
+          aws configure set aws_access_key_id ${{ env.AWS_ACCESS_KEY_ID }} --profile rerun_dev
+          aws configure set aws_secret_access_key ${{ env.AWS_SECRET_ACCESS_KEY }} --profile rerun_dev
+          aws configure set aws_session_token ${{ env.AWS_SESSION_TOKEN }} --profile rerun_dev
+          aws configure list --profile rerun_dev
+          aws sts get-caller-identity --profile rerun_dev
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.8.1
+
+      - name: Terraform Init
+        working-directory: test/integration
+        id: init
+        run: |
+          aws sts get-caller-identity --profile rerun_dev
+          git config --global url."https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com".insteadOf ssh://git@github.com
+          terraform init
+
+      # workspace new switches to the new workspace but we want to select it and fail if we can't for whatever reason
+      - name: Terraform Workspace Select
+        working-directory: test/integration
+        id: workspace-select
+        run: terraform workspace select "pr-${{ inputs.pr }}"
+
+      - name: Terraform Destroy
+        working-directory: test/integration
+        run: terraform apply -destroy -auto-approve -input=false
+

@@ -67,7 +67,7 @@ jobs:
         run: aws s3 cp ./agent-* s3://resim-binaries/agent/
 
       - name: Test and Run coverage
-        run: go test ./... -v -json -race -coverprofile=coverage.out > raw_test_output.json
+        run: go test . -v -json -race -coverprofile=coverage.out > raw_test_output.json
 
       - name: Display test output
         if: always()

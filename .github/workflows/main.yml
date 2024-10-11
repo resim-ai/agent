@@ -61,13 +61,13 @@ jobs:
       app-id: ${{ secrets.DEPLOYMENT_BOT_APP_ID }}
       private-key: ${{ secrets.DEPLOYMENT_BOT_PRIVATE_KEY }}
 
-# TODO: Integration test https://app.asana.com/0/1207977581994839/1208362865864394/f
   integration_tests:
-    name: Run intergration tests
+    name: Integration test
     uses: ./.github/workflows/integration-tests.yml
     with:
       pr: ${{ github.event.pull_request.number}}
     secrets:
+      AGENT_TEST_PASSWORD: ${{ secrets.AGENT_TEST_PASSWORD }}
       DEPLOYMENT_BOT_APP_ID: ${{ secrets.DEPLOYMENT_BOT_APP_ID }}
       DEPLOYMENT_BOT_PRIVATE_KEY: ${{ secrets.DEPLOYMENT_BOT_PRIVATE_KEY }}
       agent_password: ${{ secrets.agent_password }}
