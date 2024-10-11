@@ -17,7 +17,7 @@ func (s *AgentTestSuite) SetupTest() {
 	s.createTestSystem()
 	s.createTestBranch()
 	s.buildIDS3 = s.createBuild("public.ecr.aws/docker/library/hello-world:latest")
-	s.buildIDLocal = s.createBuild("909785973729.dkr.ecr.us-east-1.amazonaws.com/agent:" + viper.GetViper().GetString(LocalImageTagKey))
+	s.buildIDLocal = s.createBuild("909785973729.dkr.ecr.us-east-1.amazonaws.com/agent-test:" + viper.GetViper().GetString(LocalImageTagKey))
 	s.createMetricsBuild()
 	s.createS3TestExperience()
 	s.createS3TestExperience()
