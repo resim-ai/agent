@@ -198,7 +198,7 @@ jobs:
     needs: [test]
     uses: resim-ai/workflows/.github/workflows/create-update-deployment-bot-comment.yml@v2
     with:
-      repository: rerun
+      repository: agent
       pr_number: ${{ inputs.pr }}
       ref_name: ${{ github.ref_name }}
       comment_key: deploy-
@@ -223,6 +223,8 @@ jobs:
     name: Stop test environment
     needs: [test]
     runs-on: ubuntu-latest
+    env:
+      TF_VAR_agent_password: "${{ secrets.agent_password }}"
     steps:
       - name: Checkout
         uses: actions/checkout@v3
