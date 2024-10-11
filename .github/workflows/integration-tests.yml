@@ -203,7 +203,7 @@ jobs:
       ref_name: ${{ github.ref_name }}
       comment_key: deploy-
       comment_body: |
-        # End-to-end test results
+        # Integration test
 
         ## Result 🧪 ${{ needs.test.outputs.test_outcome }}
 
