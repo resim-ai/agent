@@ -36,6 +36,7 @@ const (
 
 	APIHostKey          = "api-host"
 	AuthHostKey         = "auth-host"
+	LocalImageTagKey    = "local-image-tag"
 	PoolLabelsKey       = "pool-labels"
 	UsernameKey         = "username"
 	PasswordKey         = "password"
@@ -56,9 +57,11 @@ type AgentTestSuite struct {
 	projectID        uuid.UUID
 	systemID         uuid.UUID
 	branchID         uuid.UUID
-	buildID          uuid.UUID
+	buildIDS3        uuid.UUID
+	buildIDLocal     uuid.UUID
 	metricsBuildID   uuid.UUID
-	experiences      []uuid.UUID
+	s3Experiences    []uuid.UUID
+	localExperiences []uuid.UUID
 	poolLabels       api.PoolLabels
 }
 
@@ -130,7 +133,8 @@ func NewAgentTestSuiteWithAPIClient(
 	}
 
 	return &AgentTestSuite{
-		experiences:      []uuid.UUID{},
+		localExperiences: []uuid.UUID{},
+		s3Experiences:    []uuid.UUID{},
 		APIClient:        apiClient,
 		APIHost:          apiHost,
 		AuthHost:         authHost,
@@ -203,8 +207,7 @@ func (s *AgentTestSuite) createTestBranch() {
 	s.branchID = createBranchResponse.JSON201.BranchID
 }
 
-func (s *AgentTestSuite) createBuild() {
-	imageURI := "public.ecr.aws/docker/library/hello-world:latest"
+func (s *AgentTestSuite) createBuild(imageURI string) uuid.UUID {
 	buildDescription := "description"
 	buildVersion := uuid.New().String()
 
@@ -224,7 +227,7 @@ func (s *AgentTestSuite) createBuild() {
 		slog.Error("Unable to create build", "error", err)
 		os.Exit(1)
 	}
-	s.buildID = createBuildResponse.JSON201.BuildID
+	return createBuildResponse.JSON201.BuildID
 }
 
 func (s *AgentTestSuite) createMetricsBuild() {
@@ -247,7 +250,7 @@ func (s *AgentTestSuite) createMetricsBuild() {
 	s.metricsBuildID = createMetricsBuildResponse.JSON201.MetricsBuildID
 }
 
-func (s *AgentTestSuite) createTestExperience() {
+func (s *AgentTestSuite) createS3TestExperience() {
 	// Create an experience:
 	experienceName := fmt.Sprintf("Test Experience %v", uuid.New())
 	// Generate a location and upload some experience files:
@@ -267,7 +270,47 @@ func (s *AgentTestSuite) createTestExperience() {
 		slog.Error("Unable to create experience", "error", err)
 		os.Exit(1)
 	}
-	s.experiences = append(s.experiences, createExperienceResponse.JSON201.ExperienceID)
+	s.s3Experiences = append(s.s3Experiences, createExperienceResponse.JSON201.ExperienceID)
+}
+
+func (s *AgentTestSuite) createLocalTestExperiences() {
+	// Create an experience:
+	experienceName1 := fmt.Sprintf("Test Experience %v", uuid.New())
+	experienceName2 := fmt.Sprintf("Test Experience %v", uuid.New())
+
+	testLocation1 := "/test_experience_data/experience_1"
+	testLocation2 := "/test_experience_data/experience_1"
+
+	createExperienceRequest := api.CreateExperienceInput{
+		Name:        experienceName1,
+		Description: "description",
+		Location:    testLocation1,
+	}
+	createExperienceResponse, err := s.APIClient.CreateExperienceWithResponse(
+		context.Background(),
+		s.projectID,
+		createExperienceRequest,
+	)
+	if err != nil {
+		slog.Error("Unable to create experience", "error", err)
+		os.Exit(1)
+	}
+	s.localExperiences = append(s.localExperiences, createExperienceResponse.JSON201.ExperienceID)
+	createExperienceRequest = api.CreateExperienceInput{
+		Name:        experienceName2,
+		Description: "description",
+		Location:    testLocation2,
+	}
+	createExperienceResponse, err = s.APIClient.CreateExperienceWithResponse(
+		context.Background(),
+		s.projectID,
+		createExperienceRequest,
+	)
+	if err != nil {
+		slog.Error("Unable to create experience", "error", err)
+		os.Exit(1)
+	}
+	s.localExperiences = append(s.localExperiences, createExperienceResponse.JSON201.ExperienceID)
 }
 
 // Generates an experience and uploads it to an s3 path
@@ -333,15 +376,15 @@ func Base64EncodeString(input string) []byte {
 	return base64Input
 }
 
-func (s *AgentTestSuite) createValidateAndAwaitBatch() api.Batch {
+func (s *AgentTestSuite) createAndAwaitBatch(buildID uuid.UUID, experiences []uuid.UUID) api.Batch {
 	// Create a batch:
 	createBatchRequest := api.BatchInput{
-		ExperienceIDs: &s.experiences,
-		BuildID:       &s.buildID,
+		ExperienceIDs: &experiences,
+		BuildID:       &buildID,
 		PoolLabels:    &s.poolLabels,
 		Parameters: &api.BatchParameters{
-			"buildID":         s.buildID.String(),
-			"repeatedBuildID": s.buildID.String(),
+			"buildID":         buildID.String(),
+			"repeatedBuildID": buildID.String(),
 		},
 	}
 	createBatchRequest.MetricsBuildID = &s.metricsBuildID

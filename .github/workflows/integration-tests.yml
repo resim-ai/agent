@@ -96,10 +96,47 @@ jobs:
         working-directory: test/integration
         run: terraform apply -auto-approve -input=false
 
+  build_test_image:
+    name: Build test image
+    runs-on: ubuntu-latest
+    env:
+      registry: 909785973729.dkr.ecr.us-east-1.amazonaws.com
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials us-east-1
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::909785973729:role/actions-agent
+          aws-region: us-east-1
+
+      - name: Login to ECR us-east-1
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.registry }}
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          # list of Docker images to use as base name for tags
+          images: |
+            ${{ env.registry }}/agent_test
+          # generate Docker tags based on the following events/attributes
+          tags: |
+            type=ref,event=pr
+
+      - name: Docker Build and Push
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
   test:
     name: Run test
     runs-on: ubuntu-latest
-    needs: start_instance
+    needs: [start_instance, build_test_image]
     outputs:
       test_outcome: ${{ steps.test.outcome }}
       test_report: ${{ steps.test-output.outputs.TEST_OUTPUT }}
