@@ -17,9 +17,8 @@ Logs are streamed from the test host to Cloudwatch and can be found in the `reru
 
 For now, the ReRun environment is hard-coded because the appropriate changes aren't in staging yet. Once we're in staging, we'll use that environment to test against.
 
-Next step once this is merged and the above is complete is to call this workflow when relevant changes are made in ReRun as well. In that scenario, we'll pass across the appropriate test environment from the ReRun PR.
-
-https://app.asana.com/0/1207977581994839/1208362865864394/f
+Next step once this is merged and the above is complete is to call this workflow when relevant changes are made in
+ReRun as well. In that scenario, we'll pass across the appropriate test environment from the ReRun PR.
 
 ## Local Dev
 

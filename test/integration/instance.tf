@@ -138,6 +138,7 @@ data "aws_iam_policy_document" "this" {
       "ecr:DescribeRepositories",
       "ecr:GetRepositoryPolicy",
       "ecr:GetDownloadUrlForLayer",
+      "ecr:GetAuthorizationToken",
       "ecr:ListImages",
       "ecr:Get*",
       "ecr:List*",
