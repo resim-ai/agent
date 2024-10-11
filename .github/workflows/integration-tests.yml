@@ -16,6 +16,10 @@ on:  #trunk-ignore(yamllint/truthy)
         description: PR number
         required: true
         type: number
+      commit:
+        description: Source commit to test
+        required: true
+        type: string
 
 jobs:
   start_instance:
@@ -120,7 +124,7 @@ jobs:
               owner: 'resim-ai',
               repo: 'agent',
               name: 'Agent Integration Test',
-              head_sha: '${{ github.sha }}',
+              head_sha: '${{ inputs.commit }}',
               status: 'in_progress',
             })
             return response.data.id
