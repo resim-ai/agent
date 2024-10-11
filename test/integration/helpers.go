@@ -36,7 +36,7 @@ const (
 
 	APIHostKey          = "api-host"
 	AuthHostKey         = "auth-host"
-	LocalImageTagKey    = "local-image-tag"
+	LocalImageKey       = "local-image"
 	PoolLabelsKey       = "pool-labels"
 	UsernameKey         = "username"
 	PasswordKey         = "password"

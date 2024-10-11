@@ -209,7 +209,7 @@ jobs:
           AGENT_TEST_AUTH_HOST: https://resim-dev.us.auth0.com
           AGENT_TEST_EXPERIENCE_BUCKET: resim-agent-test-pr-${{ inputs.pr }}
           AGENT_TEST_PASSWORD: ${{ secrets.AGENT_TEST_PASSWORD }}
-          AGENT_TEST_LOCAL_IMAGE_TAG: pr-${{ inputs.pr }}
+          AGENT_TEST_LOCAL_IMAGE: 909785973729.dkr.ecr.us-east-1.amazonaws.com:agent-test:pr-${{ inputs.pr }}
         continue-on-error: true
 
       - name: Get Test Output
