@@ -131,6 +131,26 @@ data "aws_iam_policy_document" "this" {
   }
 
   statement {
+    sid    = "ECR"
+    effect = "Allow"
+
+    actions = [
+      "ecr:DescribeRepositories",
+      "ecr:GetRepositoryPolicy",
+      "ecr:GetDownloadUrlForLayer",
+      "ecr:ListImages",
+      "ecr:Get*",
+      "ecr:List*",
+      "ecr:Describe*",
+      "ecr:BatchGetImage",
+      "ecr:BatchCheckLayerAvailability"
+    ]
+    resources = [
+      "arn:aws:ecr:us-east-1:909785973729:repository/agent-test",
+    ]
+  }
+
+  statement {
     sid = "AgentCIRW"
     resources = [
       "arn:aws:s3:::resim-binaries/agent/*"
