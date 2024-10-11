@@ -131,6 +131,12 @@ data "aws_iam_policy_document" "this" {
   }
 
   statement {
+    sid       = "GetAuthorizationToken"
+    effect    = "Allow"
+    resources = ["*"]
+    actions   = ["ecr:GetAuthorizationToken"]
+  }
+  statement {
     sid    = "ECR"
     effect = "Allow"
 
@@ -138,7 +144,6 @@ data "aws_iam_policy_document" "this" {
       "ecr:DescribeRepositories",
       "ecr:GetRepositoryPolicy",
       "ecr:GetDownloadUrlForLayer",
-      "ecr:GetAuthorizationToken",
       "ecr:ListImages",
       "ecr:Get*",
       "ecr:List*",
