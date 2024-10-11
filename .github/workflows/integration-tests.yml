@@ -196,7 +196,7 @@ jobs:
           go get
           go build ./test/integration
 
-      - name: Run End To End Test
+      - name: Run Integration Test Suite
         id: test
         run: go test -v ./test/integration >> test.out
         env:
