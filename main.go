@@ -69,25 +69,17 @@ func (a Agent) Start() error {
 	}
 	defer a.DockerClient.Close()
 
-	err = a.checkAuth()
+	err = a.checkAuth("startup")
 	if err != nil {
 		log.Fatal("error in authentication")
 	}
 
 	ctx := context.Background()
-
-	// start api.Client
-	var tokenSource oauth2.TokenSource
-	tokenSource = oauth2.ReuseTokenSource(a.Token, tokenSource)
-	oauthClient := oauth2.NewClient(ctx, tokenSource)
-	a.Token, err = tokenSource.Token()
+	apiClient, err := a.getAPIClient(ctx)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("error setting API client", "err", err)
 	}
-	a.APIClient, err = api.NewClientWithResponses(a.APIHost, api.WithHTTPClient(oauthClient))
-	if err != nil {
-		log.Fatal(err)
-	}
+	a.APIClient = apiClient
 	defer a.saveCredentialCache()
 
 	agentStateChan := make(chan agentStatus)
@@ -115,7 +107,7 @@ func (a Agent) Start() error {
 	}
 
 	for {
-		a.checkAuth()
+		a.checkAuth("main")
 
 		task := a.getTask()
 		if task.TaskName == nil {
@@ -199,7 +191,7 @@ func (a Agent) getTask() api.TaskPollOutput {
 	}
 
 	if pollResponse.StatusCode() == 204 {
-		// slog.Debug("No task available")
+		slog.Debug("No task available", "countdown", time.Until(a.Token.Expiry))
 		return api.TaskPollOutput{}
 	}
 
@@ -294,7 +286,7 @@ func (a Agent) runWorker(ctx context.Context, task Task, taskStateChan chan task
 	return nil
 }
 
-func (a *Agent) startHeartbeat(ctx context.Context) error {
+func (a Agent) startHeartbeat(ctx context.Context) error {
 	ticker := time.NewTicker(10 * time.Second)
 
 	hbInput := api.AgentHeartbeatInput{
@@ -304,6 +296,7 @@ func (a *Agent) startHeartbeat(ctx context.Context) error {
 
 	go func() {
 		for range ticker.C {
+			a.checkAuth("hb")
 
 			if a.CurrentTaskName != "" {
 				hbInput.TaskName = &a.CurrentTaskName
@@ -347,4 +340,21 @@ func CreateTmpResimDir() error {
 		}
 	}
 	return nil
+}
+
+func (a *Agent) getAPIClient(ctx context.Context) (*api.ClientWithResponses, error) {
+	var tokenSource oauth2.TokenSource
+	tokenSource = oauth2.ReuseTokenSource(a.Token, tokenSource)
+	oauthClient := oauth2.NewClient(ctx, tokenSource)
+	token, err := tokenSource.Token()
+	if err != nil {
+		return &api.ClientWithResponses{}, err
+	}
+	a.Token = token
+	APIClient, err := api.NewClientWithResponses(a.ApiHost, api.WithHTTPClient(oauthClient))
+	if err != nil {
+		return &api.ClientWithResponses{}, err
+	}
+
+	return APIClient, nil
 }

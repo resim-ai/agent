@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -36,7 +37,9 @@ type tokenJSON struct {
 	ExpiresIn    int32  `json:"expires_in"`
 }
 
-func (a *Agent) checkAuth() error {
+func (a *Agent) checkAuth(source string) error {
+	slog.Info("checking auth", "source", source)
+	var gotNewToken bool
 	a.loadCredentialCache()
 	if a.Token != nil && time.Now().After(a.Token.Expiry.Add(-10*time.Second)) && a.Token.RefreshToken != "" {
 		token := a.authenticate(authModeRefresh)
@@ -45,10 +48,22 @@ func (a *Agent) checkAuth() error {
 		} else {
 			a.Token = a.authenticate(authModePassword)
 		}
+		fmt.Println(a.Token)
+		fmt.Println("here")
 		a.saveCredentialCache()
 	} else if !(a.Token.Valid()) {
 		a.Token = a.authenticate(authModePassword)
+		fmt.Println(a.Token)
+		fmt.Println("theere")
 		a.saveCredentialCache()
+	}
+
+	if gotNewToken {
+		newClient, err := a.getAPIClient(context.Background())
+		if err != nil {
+			slog.Error("error setting API client", "err", err)
+		}
+		a.ApiClient = newClient
 	}
 
 	return nil
@@ -56,6 +71,7 @@ func (a *Agent) checkAuth() error {
 
 func (a *Agent) authenticate(mode AuthMode) *oauth2.Token {
 
+	slog.Info("authenticating", "mode", mode)
 	tokenURL := fmt.Sprintf("%v/oauth/token", a.AuthHost)
 	username := viper.GetString(UsernameKey)
 	password := viper.GetString(PasswordKey)
@@ -103,7 +119,8 @@ func (a *Agent) authenticate(mode AuthMode) *oauth2.Token {
 		AccessToken:  tj.AccessToken,
 		TokenType:    tj.TokenType,
 		RefreshToken: tj.RefreshToken,
-		Expiry:       time.Now().Add(time.Duration(tj.ExpiresIn) * time.Second),
+		// Expiry:       time.Now().Add(time.Duration(tj.ExpiresIn) * time.Second),
+		Expiry: time.Now().Add(time.Duration(60) * time.Second),
 	}
 }
 
