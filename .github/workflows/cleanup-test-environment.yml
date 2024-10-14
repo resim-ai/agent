@@ -4,9 +4,16 @@ on:
     types:
       - closed
 
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to destroy
+        type: string
+        required: true
+
 permissions:
   id-token: write
-
+ 
 jobs:
   stop_instance:
     name: Stop test environment
@@ -54,11 +61,22 @@ jobs:
           git config --global url."https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com".insteadOf ssh://git@github.com
           terraform init
 
+      - name: Determine workspace
+        id: params
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          if [ -z ${ENVIRONMENT+x} ]; then
+            echo "WORKSPACE=pr-${{ github.event.number }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "WORKSPACE=$ENVIRONMENT" >> "$GITHUB_OUTPUT"
+          fi
+
       # workspace new switches to the new workspace but we want to select it and fail if we can't for whatever reason
       - name: Terraform Workspace Select
         working-directory: test/integration
         id: workspace-select
-        run: terraform workspace select "pr-${{ github.event.number }}"
+        run: terraform workspace select ${{ steps.params.outputs.ENVIRONMENT }}
 
       - name: Terraform Destroy
         working-directory: test/integration

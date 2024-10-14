@@ -45,17 +45,21 @@ jobs:
       - name: Install dependencies
         run: go get .
 
-      - name: Extract PR number from ref_name
+      - name: Extract binary version from ref
         run: |
-          PR=$(echo "${{ github.ref_name }}" | cut -d'/' -f1)
-          echo "PR_NUMBER=pr-$PR" >> "$GITHUB_OUTPUT"
+          if [[ "${{ github.ref_name }}" == main ]]; then
+            echo "VERSION=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          else
+            REF=$(echo "${{ github.ref_name }}" | cut -d'/' -f1)
+            echo "VERSION=pr-$REF" >> "$GITHUB_OUTPUT"
+          fi
         id: extract_pr
 
       - name: Build Go
         if: steps.go-build-cache.outputs.cache-hit != 'true'
-        run: go build -o ./agent-linux-amd64-${{ steps.extract_pr.outputs.PR_NUMBER }} -buildvcs=false ./cmd
+        run: go build -o ./agent-linux-amd64-${{ steps.extract_pr.outputs.VERSION }} -buildvcs=false ./cmd
         env:
-          PR_NUMBER: ${{ steps.extract_pr.outputs.PR_NUMBER }}
+          VERSION: ${{ steps.extract_pr.outputs.VERSION }}
 
       - name: Configure AWS Credentials us-east-1
         uses: aws-actions/configure-aws-credentials@v4

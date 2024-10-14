@@ -1,5 +1,7 @@
 ---
 name: Integration tests
+run-name: "ReRun PR #${{ inputs.pr }} - agent integration tests"
+
 on:  #trunk-ignore(yamllint/truthy)
   workflow_call:
     secrets:
@@ -38,6 +40,12 @@ on:  #trunk-ignore(yamllint/truthy)
         description: Pass through github.event.pull_request.number
         required: true
         type: string
+
+permissions:
+  id-token: write
+  contents: write
+  checks: write
+  pull-requests: write
 
 jobs:
   start_instance:

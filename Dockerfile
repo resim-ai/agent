@@ -7,7 +7,7 @@
 ARG GO_VERSION=1.23.1
 
 # Base container to cache go.mod dependencies
-FROM golang:${GO_VERSION} AS base
+FROM public.ecr.aws/docker/library/golang:${GO_VERSION} AS base
 
 ARG CGO_ENABLED=1
 ARG TARGET_PLATFORM=linux
