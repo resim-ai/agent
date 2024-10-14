@@ -63,6 +63,7 @@ jobs:
 
   integration_tests:
     name: Integration test
+    if: github.event_name == 'pull_request'
     uses: ./.github/workflows/integration-tests.yml
     with:
       environment: pr-${{ github.event.pull_request.number}}
