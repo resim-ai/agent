@@ -12,7 +12,7 @@ on:
 
 permissions:
   id-token: write
- 
+
 jobs:
   stop_instance:
     name: Stop test environment
