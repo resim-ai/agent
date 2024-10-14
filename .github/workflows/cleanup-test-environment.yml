@@ -4,6 +4,8 @@ on:
     types:
       - closed
 
+permissions:
+  id-token: write
 
 jobs:
   stop_instance:
