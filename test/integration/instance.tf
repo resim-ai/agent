@@ -35,12 +35,17 @@ provider "aws" {
 }
 
 variable "environment" {
-  type    = string
-  default = "dev"
+  description = "This should be either 'pr-xx' if triggered from the agent repo, 'staging' if triggered by the rerun repo on merge to main, or 'dev-env-pr-xx' if it's a PR in rerun"
+  type        = string
 }
 
 variable "agent_password" {
   type = string
+}
+
+locals {
+  # If this is a rerun PR, use the PR environment; otherwise use staging
+  api_host = startswith(var.environment, "dev") ? "${var.environment}.agentapi.dev.resim.io" : "agentapi.resim.io"
 }
 
 data "aws_ami" "this" {
@@ -68,7 +73,7 @@ data "cloudinit_config" "config" {
       "${path.module}/templates/cloud-config.yaml.tftpl",
       {
         auth_host      = "https://resim-dev.us.auth0.com"
-        api_host       = "https://dev-env-pr-1269.agentapi.dev.resim.io/agent/v1"
+        api_host       = "https://${local.api_host}/agent/v1"
         pool_labels    = "agent-test-${terraform.workspace}"
         agent_name     = "barry"
         agent_version  = terraform.workspace

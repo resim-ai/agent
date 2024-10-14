@@ -12,12 +12,30 @@ on:  #trunk-ignore(yamllint/truthy)
       AGENT_TEST_PASSWORD:
         required: true
     inputs:
-      pr:
-        description: PR number
+      environment:
+        description: Environment name. PR ref for agent repo e.g. 'pr-22', dev env for rerun, e.g. 'dev-env-pr-4444'
         required: true
-        type: number
+        type: string
       ref_name:
         description: Ref for checks
+        required: true
+        type: string
+      pr:
+        description: Pass through github.event.pull_request.number
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment name. PR ref for agent repo e.g. 'pr-22', dev env for rerun, e.g. 'dev-env-pr-4444'
+        required: true
+        type: string
+      ref_name:
+        description: Ref for checks
+        required: true
+        type: string
+      pr:
+        description: Pass through github.event.pull_request.number
         required: true
         type: string
 
@@ -27,6 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TF_VAR_agent_password: "${{ secrets.agent_password }}"
+      TF_VAR_environment: "${{ inputs.environment }}"
 
     steps:
       - name: Checkout
@@ -77,14 +96,14 @@ jobs:
       - name: Terraform Workspace New
         working-directory: test/integration
         id: workspace-new
-        run: terraform workspace new "pr-${{ inputs.pr }}"
+        run: terraform workspace new "${{ inputs.environment }}"
         continue-on-error: true
 
       # workspace new switches to the new workspace but we want to select it and fail if we can't for whatever reason
       - name: Terraform Workspace Select
         working-directory: test/integration
         id: workspace-select
-        run: terraform workspace select "pr-${{ inputs.pr }}"
+        run: terraform workspace select "${{ inputs.environment }}"
 
       - name: Terraform Validate
         working-directory: test/integration
@@ -124,7 +143,7 @@ jobs:
             ${{ env.registry }}/agent-test
           # generate Docker tags based on the following events/attributes
           tags: |
-            type=ref,event=pr
+            type=raw,value=${{ inputs.environment }}
 
       - name: Docker Build and Push
         uses: docker/build-push-action@v6
@@ -142,6 +161,8 @@ jobs:
     outputs:
       test_outcome: ${{ steps.test.outcome }}
       test_report: ${{ steps.test-output.outputs.TEST_OUTPUT }}
+      REPO: ${{ steps.params.outputs.REPO }}
+      API_HOST: ${{ steps.params.outputs.API_HOST }}
     steps:
       - name: Generate Deployment Bot token
         id: generate_token
@@ -152,6 +173,22 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: agent,rerun
 
+      - name: Determine environment parameters
+        id: params
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          if [[ "$ENVIRONMENT" == dev* ]]; then
+            echo "REPO=rerun" >> "$GITHUB_OUTPUT"
+            echo "API_HOST=$ENVIRONMENT.api.dev.resim.io" >> "$GITHUB_OUTPUT"
+          elif [[ "$ENVIRONMENT" == staging ]]; then
+            echo "REPO=rerun" >> "$GITHUB_OUTPUT"
+            echo "API_HOST=api.resim.io" >> "$GITHUB_OUTPUT"
+          else
+            echo "REPO=agent" >> "$GITHUB_OUTPUT"
+            echo "API_HOST=api.resim.io" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Register Check In Progress
         id: check-in-progress
         uses: actions/github-script@v7
@@ -161,7 +198,7 @@ jobs:
           script: |
             const response = await github.rest.checks.create({
               owner: 'resim-ai',
-              repo: 'agent',
+              repo: '${{ steps.params.outputs.REPO }}',
               name: 'Agent Integration Test',
               head_sha: '${{ inputs.ref_name }}',
               status: 'in_progress',
@@ -202,14 +239,14 @@ jobs:
         env:
           AWS_PROFILE: rerun_dev
           AWS_REGION: us-east-1
-          AGENT_TEST_NAME: ci-integration-test-pr-${{ inputs.pr }}
-          AGENT_TEST_POOL_LABELS: agent-test-pr-${{ inputs.pr }}
-          AGENT_TEST_API_HOST: https://dev-env-pr-1269.api.dev.resim.io/v1/
+          AGENT_TEST_NAME: ci-integration-test-${{ inputs.environment }}
+          AGENT_TEST_POOL_LABELS: agent-test-${{ inputs.environment }}
+          AGENT_TEST_API_HOST: https://${{ steps.params.outputs.API_HOST }}/v1/
           AGENT_TEST_USERNAME: cli+e2e.resim.ai@resim.ai
           AGENT_TEST_AUTH_HOST: https://resim-dev.us.auth0.com
-          AGENT_TEST_EXPERIENCE_BUCKET: resim-agent-test-pr-${{ inputs.pr }}
+          AGENT_TEST_EXPERIENCE_BUCKET: resim-agent-test-${{ inputs.environment }}
           AGENT_TEST_PASSWORD: ${{ secrets.AGENT_TEST_PASSWORD }}
-          AGENT_TEST_LOCAL_IMAGE: 909785973729.dkr.ecr.us-east-1.amazonaws.com/agent-test:pr-${{ inputs.pr }}
+          AGENT_TEST_LOCAL_IMAGE: 909785973729.dkr.ecr.us-east-1.amazonaws.com/agent-test:${{ inputs.environment }}
         continue-on-error: true
 
       - name: Get Test Output
@@ -230,7 +267,7 @@ jobs:
           script: |
             github.rest.checks.update({
               owner: 'resim-ai',
-              repo: 'agent',
+              repo: '${{ steps.params.outputs.REPO }}',
               name: 'Agent Integration Test',
               check_run_id: ${{ steps.check-in-progress.outputs.result }},
               status: 'completed',
@@ -242,7 +279,7 @@ jobs:
     needs: [test]
     uses: resim-ai/workflows/.github/workflows/create-update-deployment-bot-comment.yml@v2
     with:
-      repository: agent
+      repository: ${{ needs.test.outputs.REPO }}
       pr_number: ${{ inputs.pr }}
       ref_name: ${{ github.ref_name }}
       comment_key: deploy-
