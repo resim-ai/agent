@@ -8,6 +8,7 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
@@ -36,10 +37,10 @@ type taskStatusMessage struct {
 }
 
 type Agent struct {
-	APIClient    *api.ClientWithResponses
-	DockerClient *client.Client
-	Token        *oauth2.Token
-	// tokenSource
+	APIClient          *api.ClientWithResponses
+	DockerClient       *client.Client
+	Token              *oauth2.Token
+	TokenMutex         sync.Mutex
 	ClientID           string
 	AuthHost           string
 	APIHost            string
@@ -53,7 +54,7 @@ type Agent struct {
 
 type Task api.TaskPollOutput
 
-func (a Agent) Start() error {
+func (a *Agent) Start() error {
 	err := a.LoadConfig()
 	if err != nil {
 		slog.Error("error loading config", "err", err)
@@ -149,7 +150,7 @@ func (a *Agent) initializeDockerClient() error {
 	return nil
 }
 
-func (a Agent) pullImage(ctx context.Context, targetImage string) error {
+func (a *Agent) pullImage(ctx context.Context, targetImage string) error {
 	slog.Info("Pulling image", "image", targetImage)
 	r, err := a.DockerClient.ImagePull(ctx, targetImage, image.PullOptions{
 		Platform: "linux/amd64",
@@ -179,7 +180,7 @@ func GetConfigDir() (string, error) {
 	return expectedDir, nil
 }
 
-func (a Agent) getTask() api.TaskPollOutput {
+func (a *Agent) getTask() api.TaskPollOutput {
 	ctx := context.Background()
 
 	pollResponse, err := a.APIClient.TaskPollWithResponse(ctx, api.TaskPollInput{
@@ -212,7 +213,7 @@ func StringifyEnvironmentVariables(inputVars [][]string) []string {
 	return envVars
 }
 
-func (a Agent) runWorker(ctx context.Context, task Task, taskStateChan chan taskStatusMessage) error {
+func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan taskStatusMessage) error {
 	providedEnvVars := StringifyEnvironmentVariables(*task.WorkerEnvironmentVariables)
 	extraEnvVars := []string{
 		"RERUN_WORKER_ENVIRONMENT=dev",
@@ -286,7 +287,7 @@ func (a Agent) runWorker(ctx context.Context, task Task, taskStateChan chan task
 	return nil
 }
 
-func (a Agent) startHeartbeat(ctx context.Context) error {
+func (a *Agent) startHeartbeat(ctx context.Context) error {
 	ticker := time.NewTicker(10 * time.Second)
 
 	hbInput := api.AgentHeartbeatInput{
@@ -351,7 +352,7 @@ func (a *Agent) getAPIClient(ctx context.Context) (*api.ClientWithResponses, err
 		return &api.ClientWithResponses{}, err
 	}
 	a.Token = token
-	APIClient, err := api.NewClientWithResponses(a.ApiHost, api.WithHTTPClient(oauthClient))
+	APIClient, err := api.NewClientWithResponses(a.APIHost, api.WithHTTPClient(oauthClient))
 	if err != nil {
 		return &api.ClientWithResponses{}, err
 	}

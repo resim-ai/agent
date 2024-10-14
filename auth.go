@@ -40,6 +40,8 @@ type tokenJSON struct {
 func (a *Agent) checkAuth(source string) error {
 	slog.Info("checking auth", "source", source)
 	var gotNewToken bool
+	a.TokenMutex.Lock()
+
 	a.loadCredentialCache()
 	if a.Token != nil && time.Now().After(a.Token.Expiry.Add(-10*time.Second)) && a.Token.RefreshToken != "" {
 		token := a.authenticate(authModeRefresh)
@@ -48,13 +50,11 @@ func (a *Agent) checkAuth(source string) error {
 		} else {
 			a.Token = a.authenticate(authModePassword)
 		}
-		fmt.Println(a.Token)
-		fmt.Println("here")
+		gotNewToken = true
 		a.saveCredentialCache()
 	} else if !(a.Token.Valid()) {
 		a.Token = a.authenticate(authModePassword)
-		fmt.Println(a.Token)
-		fmt.Println("theere")
+		gotNewToken = true
 		a.saveCredentialCache()
 	}
 
@@ -63,8 +63,9 @@ func (a *Agent) checkAuth(source string) error {
 		if err != nil {
 			slog.Error("error setting API client", "err", err)
 		}
-		a.ApiClient = newClient
+		a.APIClient = newClient
 	}
+	a.TokenMutex.Unlock()
 
 	return nil
 }
@@ -134,7 +135,7 @@ func (a *Agent) loadCredentialCache() {
 	}
 }
 
-func (a Agent) saveCredentialCache() {
+func (a *Agent) saveCredentialCache() {
 	slog.Info("saving credential cache")
 
 	data, err := json.Marshal(a.Token)
