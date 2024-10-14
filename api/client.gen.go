@@ -50,8 +50,8 @@ type TaskName = string
 
 // TaskPollInput defines model for taskPollInput.
 type TaskPollInput struct {
+	AgentID    string      `json:"agentID"`
 	PoolLabels []PoolLabel `json:"poolLabels"`
-	WorkerID   string      `json:"workerID"`
 }
 
 // TaskPollOutput defines model for taskPollOutput.

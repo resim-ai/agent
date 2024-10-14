@@ -10,7 +10,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
@@ -18,6 +17,7 @@ import (
 	"github.com/docker/docker/client"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/resim-ai/agent/api"
+	"github.com/spf13/viper"
 	"golang.org/x/oauth2"
 )
 
@@ -30,28 +30,19 @@ const (
 	agentStatusError    agentStatus = "ERROR"
 )
 
-// type taskStatus string
-
-// const (
-// 	taskStatusRunning   taskStatus = "RUNNING"
-// 	taskStatusStarting  taskStatus = "STARTING"
-// 	taskStatusError     taskStatus = "ERROR"
-// 	taskStatusSucceeded taskStatus = "SUCCEEDED"
-// )
-
 type taskStatusMessage struct {
 	Name   string
 	Status api.TaskStatus
 }
 
 type Agent struct {
-	ApiClient    *api.ClientWithResponses
+	APIClient    *api.ClientWithResponses
 	DockerClient *client.Client
 	Token        *oauth2.Token
 	// tokenSource
 	ClientID           string
 	AuthHost           string
-	ApiHost            string
+	APIHost            string
 	Name               string
 	PoolLabels         []string
 	ConfigFileOverride string
@@ -62,19 +53,19 @@ type Agent struct {
 
 type Task api.TaskPollOutput
 
-// TODO
-// set up volumes
-// upload outputs
-
-func Start(a Agent) {
-	err := a.loadConfig()
+func (a Agent) Start() error {
+	err := a.LoadConfig()
 	if err != nil {
-		log.Fatal("error loading config", err)
+		slog.Error("error loading config", "err", err)
+		return err
 	}
+
+	// TODO: check apiHost is available
 
 	err = a.initializeDockerClient()
 	if err != nil {
-		log.Fatal("error initializing Docker client", err)
+		slog.Error("error initializing Docker client", "err", err)
+		return err
 	}
 	defer a.DockerClient.Close()
 
@@ -85,10 +76,6 @@ func Start(a Agent) {
 
 	ctx := context.Background()
 
-	// 1. can we do password-realm auth in the oauth2 client? no
-	// 2. is there a way to pass a token straight in to the api client without using the oauth2 client?
-	// 3. how do we make sure we save the token on exit (and refresh)?
-
 	// start api.Client
 	var tokenSource oauth2.TokenSource
 	tokenSource = oauth2.ReuseTokenSource(a.Token, tokenSource)
@@ -97,7 +84,7 @@ func Start(a Agent) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	a.ApiClient, err = api.NewClientWithResponses(a.ApiHost, api.WithHTTPClient(oauthClient))
+	a.APIClient, err = api.NewClientWithResponses(a.APIHost, api.WithHTTPClient(oauthClient))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -121,31 +108,42 @@ func Start(a Agent) {
 
 	a.startHeartbeat(ctx)
 
+	err = CreateTmpResimDir()
+	if err != nil {
+		slog.Error("Error creating /tmp/resim", "err", err)
+		os.Exit(1)
+	}
+
 	for {
 		a.checkAuth()
 
 		task := a.getTask()
 		if task.TaskName == nil {
-			fmt.Println("no task found")
-			time.Sleep(20 * time.Second)
+			time.Sleep(10 * time.Second)
 			continue
 		}
-		fmt.Println("task name", task.TaskName)
+
+		slog.Info("Got new task", "task_name", *task.TaskName)
+
 		taskStateChan <- taskStatusMessage{
-			Name:   *task.TaskName,
-			Status: api.STARTING,
+			Name: *task.TaskName,
+			// TODO: set this back to STARTING
+			Status: "SUBMITTED",
 		}
 		agentStateChan <- agentStatusRunning
 		a.pullImage(ctx, *task.WorkerImageURI)
-		// a.pullImage(ctx, *task.WorkerEnvironmentVariables[][])
 
-		// customerContainerID := a.createCustomerContainer(task)
-		// err := a.runCustomerContainer(ctx, customerContainerID, task.Name, taskStateChan)
-		// if err != nil {
-		// 	log.Fatal(err)
-		// }
-		// agentStateChan <- agentStatusIdle
-		// time.Sleep(50 * time.Second)
+		err := a.runWorker(ctx, Task(task), taskStateChan)
+		if err != nil {
+			slog.Error("Error running worker", "err", err)
+		}
+
+		agentStateChan <- agentStatusIdle
+
+		if viper.GetBool(OneTaskKey) {
+			slog.Info("Agent launched in one-task mode, exiting")
+			os.Exit(0)
+		}
 	}
 }
 
@@ -160,6 +158,7 @@ func (a *Agent) initializeDockerClient() error {
 }
 
 func (a Agent) pullImage(ctx context.Context, targetImage string) error {
+	slog.Info("Pulling image", "image", targetImage)
 	r, err := a.DockerClient.ImagePull(ctx, targetImage, image.PullOptions{
 		Platform: "linux/amd64",
 	})
@@ -179,9 +178,9 @@ func GetConfigDir() (string, error) {
 	expectedDir := os.ExpandEnv(ConfigPath)
 	// Check first if the directory exists, and if it does not, create it:
 	if _, err := os.Stat(expectedDir); os.IsNotExist(err) {
-		err := os.Mkdir(expectedDir, 0700)
+		err := os.Mkdir(expectedDir, 0o700)
 		if err != nil {
-			log.Println("error creating directory:", err)
+			slog.Error("Error creating directory")
 			return "", err
 		}
 	}
@@ -191,30 +190,45 @@ func GetConfigDir() (string, error) {
 func (a Agent) getTask() api.TaskPollOutput {
 	ctx := context.Background()
 
-	pollResponse, err := a.ApiClient.TaskPollWithResponse(ctx, api.TaskPollInput{
-		WorkerID:   a.Name,
+	pollResponse, err := a.APIClient.TaskPollWithResponse(ctx, api.TaskPollInput{
+		AgentID:    a.Name,
 		PoolLabels: a.PoolLabels,
 	})
 	if err != nil {
-		slog.Error("error polling for task", "err", err)
+		slog.Error("Error polling for task", "err", err)
 	}
+
 	if pollResponse.StatusCode() == 204 {
-		slog.Debug("No task available")
+		// slog.Debug("No task available")
 		return api.TaskPollOutput{}
 	}
 
-	task := pollResponse.JSON200
-	fmt.Println(task)
+	if pollResponse.StatusCode() == 200 {
+		task := pollResponse.JSON200
+		return *task
+	}
 
 	return api.TaskPollOutput{}
 }
 
-func (a Agent) createCustomerContainer(task Task) string {
+func StringifyEnvironmentVariables(inputVars [][]string) []string {
+	var envVars []string
+	for _, v := range inputVars {
+		envVarString := fmt.Sprintf("%v=%v", v[0], v[1])
+		envVars = append(envVars, envVarString)
+	}
+	return envVars
+}
+
+func (a Agent) runWorker(ctx context.Context, task Task, taskStateChan chan taskStatusMessage) error {
+	providedEnvVars := StringifyEnvironmentVariables(*task.WorkerEnvironmentVariables)
+	extraEnvVars := []string{
+		"RERUN_WORKER_ENVIRONMENT=dev",
+	}
+
 	config := &container.Config{
-		// Image:      task.WorkerImageURI,
-		Image: "public.ecr.aws/ubuntu/ubuntu:latest",
-		Cmd:   []string{"sleep", "90"},
-		// Env:   stringifyEnvironmentVariables(task.EnvironmentVariables),
+		Image: *task.WorkerImageURI,
+		Env:   append(providedEnvVars, extraEnvVars...),
 	}
 	res, err := a.DockerClient.ContainerCreate(
 		context.TODO(),
@@ -241,43 +255,39 @@ func (a Agent) createCustomerContainer(task Task) string {
 		fmt.Println(err)
 	}
 
-	return res.ID
-}
-
-func stringifyEnvironmentVariables(inputVars map[string]string) []string {
-	var envVars []string
-	for k, v := range inputVars {
-		envVarString := fmt.Sprintf("%v=%v", k, v)
-		envVars = append(envVars, envVarString)
-	}
-	return envVars
-}
-
-func (a Agent) runCustomerContainer(ctx context.Context, containerID string, taskName string, taskStateChan chan taskStatusMessage) error {
-	err := a.DockerClient.ContainerStart(ctx, containerID, container.StartOptions{})
+	err = a.DockerClient.ContainerStart(ctx, res.ID, container.StartOptions{})
 	if err != nil {
 		return err
 	}
-	slog.Info("container started")
+	slog.Info("Container for task starting", "task", *task.TaskName)
 	taskStateChan <- taskStatusMessage{
-		Name:   taskName,
+		Name:   *task.TaskName,
 		Status: api.RUNNING,
 	}
+	a.setCurrentTask(*task.TaskName, api.RUNNING)
 	for {
-		status, err := a.DockerClient.ContainerInspect(ctx, containerID)
+		status, err := a.DockerClient.ContainerInspect(ctx, res.ID)
 		if err != nil {
 			return err
 		}
 		if status.State.Status != "running" {
-			slog.Info("container is not running")
-			// TODO handle error or succeeded by checking exit code
-			taskStateChan <- taskStatusMessage{
-				Name:   taskName,
-				Status: api.SUCCEEDED,
+			if status.State.ExitCode == 0 {
+				slog.Info("Container for task succeeded", "task", *task.TaskName)
+				taskStateChan <- taskStatusMessage{
+					Name:   *task.TaskName,
+					Status: api.SUCCEEDED,
+				}
+			} else {
+				slog.Info("Container exited non-zero", "task", *task.TaskName, "exit_code", status.State.ExitCode, "err", status.State.Error)
+				taskStateChan <- taskStatusMessage{
+					Name:   *task.TaskName,
+					Status: api.ERROR,
+				}
 			}
+			a.setCurrentTask("", "")
 			break
 		} else {
-			slog.Info("container is running")
+			slog.Info("Container is running", "task", *task.TaskName)
 		}
 		time.Sleep(2 * time.Second)
 	}
@@ -287,12 +297,9 @@ func (a Agent) runCustomerContainer(ctx context.Context, containerID string, tas
 func (a *Agent) startHeartbeat(ctx context.Context) error {
 	ticker := time.NewTicker(10 * time.Second)
 
-	// url := fmt.Sprintf("%v/agent/heartbeat", a.ApiHost)
-	// none := "none"
 	hbInput := api.AgentHeartbeatInput{
 		AgentName:  &a.Name,
 		PoolLabels: &a.PoolLabels,
-		TaskName:   nil,
 	}
 
 	go func() {
@@ -305,11 +312,11 @@ func (a *Agent) startHeartbeat(ctx context.Context) error {
 				hbInput.TaskStatus = &a.CurrentTaskStatus
 			}
 
-			res, err := a.ApiClient.AgentHeartbeat(ctx, hbInput)
+			_, err := a.APIClient.AgentHeartbeat(ctx, hbInput)
 			if err != nil {
 				log.Fatal(err)
 			}
-			slog.Info("hb", "url", res.Request.URL, "status", res.StatusCode, "body", res.Request.Body)
+			// slog.Info("hb", "url", res.Request.URL, "status", res.StatusCode, "task_name", a.CurrentTaskName, "task_status", a.CurrentTaskStatus)
 		}
 	}()
 
@@ -317,13 +324,27 @@ func (a *Agent) startHeartbeat(ctx context.Context) error {
 }
 
 func (a *Agent) updateTaskStatus(ctx context.Context, taskName string, status api.TaskStatus) error {
-	a.CurrentTaskName = taskName
-	a.CurrentTaskStatus = status
+	slog.Info("Updating task status", "task_name", taskName, "status", status)
 
-	res, err := a.ApiClient.UpdateTask(ctx, taskName, api.UpdateTaskInput{
+	_, err := a.APIClient.UpdateTask(ctx, taskName, api.UpdateTaskInput{
 		Status: &status,
 	})
-	spew.Dump(res.StatusCode)
 
 	return err
+}
+
+func (a *Agent) setCurrentTask(taskName string, status api.TaskStatus) {
+	a.CurrentTaskName = taskName
+	a.CurrentTaskStatus = status
+}
+
+func CreateTmpResimDir() error {
+	dir := "/tmp/resim"
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		err := os.Mkdir(dir, 0o700)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

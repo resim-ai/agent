@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"fmt"
 	"log"
 	"log/slog"
 	"path/filepath"
@@ -11,13 +10,14 @@ import (
 )
 
 const (
-	ApiHostDefault          = "https://agentapi.resim.ai/agent/v1"
-	ApiHostKey              = "api-host"
+	APIHostDefault          = "https://agentapi.resim.ai/agent/v1"
+	APIHostKey              = "api-host"
 	AuthHostDefault         = "https://resim.us.auth0.com"
 	AuthHostKey             = "auth-host"
 	ClientIDDefault         = devClientID // TODO default to prod
 	ClientIDKey             = "client-id"
 	PoolLabelsKey           = "pool-labels"
+	OneTaskKey              = "one-task"
 	UsernameKey             = "username"
 	PasswordKey             = "password"
 	AgentNameKey            = "name"
@@ -27,19 +27,20 @@ const (
 	CredentialCacheFilename = "cache.json"
 )
 
-func (a *Agent) loadConfig() error {
+func (a *Agent) LoadConfig() error {
 	viper.SetConfigName("config") // name of config file (without extension)
 	viper.SetConfigType("yaml")   // REQUIRED if the config file does not have the extension in the name
 	if a.ConfigFileOverride != "" {
 		configDir, configFile := filepath.Split(a.ConfigFileOverride)
 		viper.AddConfigPath(configDir)
 		viper.SetConfigName(configFile)
+	} else {
+		viper.AddConfigPath(ConfigPath)
 	}
 
-	viper.AddConfigPath(ConfigPath) // call multiple times to add many search paths
-	err := viper.ReadInConfig()     // Find and read the config file
-	if err != nil {                 // Handle errors reading the config file
-		panic(fmt.Errorf("fatal error in config file: %w", err))
+	err := viper.ReadInConfig() // Find and read the config file
+	if err != nil {             // Handle errors reading the config file
+		return err
 	}
 
 	viper.SetEnvPrefix(EnvPrefix)
@@ -50,11 +51,11 @@ func (a *Agent) loadConfig() error {
 	// TODO: work out how to convert strings into level numbers
 	slog.SetLogLoggerLevel(slog.LevelDebug)
 
-	viper.SetDefault(ApiHostKey, ApiHostDefault)
+	viper.SetDefault(APIHostKey, APIHostDefault)
 	viper.SetDefault(AuthHostKey, AuthHostDefault)
 	viper.SetDefault(ClientIDKey, ClientIDDefault)
 
-	a.ApiHost = viper.GetString(ApiHostKey)
+	a.APIHost = viper.GetString(APIHostKey)
 	a.AuthHost = viper.GetString(AuthHostKey)
 	a.ClientID = viper.GetString(ClientIDKey)
 
@@ -69,7 +70,7 @@ func (a *Agent) loadConfig() error {
 	a.PoolLabels = viper.GetStringSlice(PoolLabelsKey)
 
 	slog.Info("loaded config",
-		"apiHost", a.ApiHost,
+		"apiHost", a.APIHost,
 		"authHost", a.AuthHost,
 		"name", a.Name,
 		"poolLabels", a.PoolLabels,

@@ -1,11 +1,16 @@
 package main
 
 import (
+	"os"
+
 	"github.com/resim-ai/agent"
 )
 
 func main() {
 	a := agent.Agent{}
 
-	agent.Start(a)
+	err := a.Start()
+	if err != nil {
+		os.Exit(1)
+	}
 }

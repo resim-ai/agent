@@ -22,3 +22,11 @@ go.work
 go.work.sum
 
 agent
+
+# Terraform
+.terraform
+test/integration/.terraform.lock.hcl
+
+# direnv
+.envrc
+.env
