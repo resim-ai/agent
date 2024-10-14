@@ -65,8 +65,9 @@ jobs:
     name: Integration test
     uses: ./.github/workflows/integration-tests.yml
     with:
-      pr: ${{ github.event.pull_request.number}}
+      environment: pr-${{ github.event.pull_request.number}}
       ref_name: ${{ github.event.pull_request.head.sha }}
+      pr: ${{ github.event.pull_request.number }}
     secrets:
       AGENT_TEST_PASSWORD: ${{ secrets.AGENT_TEST_PASSWORD }}
       DEPLOYMENT_BOT_APP_ID: ${{ secrets.DEPLOYMENT_BOT_APP_ID }}

@@ -41,7 +41,7 @@ runcmd:
   - /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
   - |
     # Download and install the agent
-    aws s3 cp s3://resim-binaries/agent/agent-linux-amd64-pr-6 /usr/local/bin/agent
+    aws s3 cp s3://resim-binaries/agent/agent-linux-amd64-${agent_version} /usr/local/bin/agent
     chmod +x /usr/local/bin/agent
 
     # Start the agent
