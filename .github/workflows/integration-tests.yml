@@ -1,5 +1,7 @@
 ---
 name: Integration tests
+run-name: "ReRun PR #${{ inputs.pr }} - agent integration tests"
+
 on:  #trunk-ignore(yamllint/truthy)
   workflow_call:
     secrets:
