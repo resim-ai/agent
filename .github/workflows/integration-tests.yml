@@ -39,6 +39,12 @@ on:  #trunk-ignore(yamllint/truthy)
         required: true
         type: string
 
+permissions:
+  id-token: write
+  contents: write
+  checks: write
+  pull-requests: write
+
 jobs:
   start_instance:
     name: Start test environment
