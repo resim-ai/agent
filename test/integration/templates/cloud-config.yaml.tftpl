@@ -1,0 +1,48 @@
+# vi:ft=yaml
+
+repo_update: true
+repo_upgrade: all
+apt:
+  preserve_sources_list: true
+  sources:
+    docker.list:
+      keyid: 9DC858229FC7DD38854AE2D88D81803C0EBFCD88
+      source: deb [arch=amd64] https://download.docker.com/linux/ubuntu jammy stable
+
+packages:
+  - awscli
+  - wget
+  - rsyslog
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+
+write_files:
+  - encoding: b64
+    path: /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+    owner: root:root
+    permissions: '0644'
+    content: ${cloudwatch_agent_config}
+  - path: /resim/config
+    owner: root:root
+    permissions: '0644'
+    content: |
+      auth-host: ${auth_host}
+      api-host: ${api_host}
+      name: ${agent_name}
+      pool-labels:
+        - ${pool_labels}
+      username: ${agent_username}
+      password: ${agent_password}
+
+runcmd:
+  - wget https://s3.amazonaws.com/amazoncloudwatch-agent/debian/amd64/latest/amazon-cloudwatch-agent.deb
+  - dpkg -i -E ./amazon-cloudwatch-agent.deb
+  - /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+  - |
+    # Download and install the agent
+    aws s3 cp s3://resim-binaries/agent/agent-linux-amd64-${agent_version} /usr/local/bin/agent
+    chmod +x /usr/local/bin/agent
+
+    # Start the agent
+    nohup agent > /resim/agent.log 2>&1 &

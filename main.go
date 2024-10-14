@@ -36,13 +36,13 @@ type taskStatusMessage struct {
 }
 
 type Agent struct {
-	ApiClient    *api.ClientWithResponses
+	APIClient    *api.ClientWithResponses
 	DockerClient *client.Client
 	Token        *oauth2.Token
 	// tokenSource
 	ClientID           string
 	AuthHost           string
-	ApiHost            string
+	APIHost            string
 	Name               string
 	PoolLabels         []string
 	ConfigFileOverride string
@@ -84,7 +84,7 @@ func (a Agent) Start() error {
 	if err != nil {
 		log.Fatal(err)
 	}
-	a.ApiClient, err = api.NewClientWithResponses(a.ApiHost, api.WithHTTPClient(oauthClient))
+	a.APIClient, err = api.NewClientWithResponses(a.APIHost, api.WithHTTPClient(oauthClient))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -178,9 +178,9 @@ func GetConfigDir() (string, error) {
 	expectedDir := os.ExpandEnv(ConfigPath)
 	// Check first if the directory exists, and if it does not, create it:
 	if _, err := os.Stat(expectedDir); os.IsNotExist(err) {
-		err := os.Mkdir(expectedDir, 0700)
+		err := os.Mkdir(expectedDir, 0o700)
 		if err != nil {
-			log.Println("error creating directory:", err)
+			slog.Error("Error creating directory")
 			return "", err
 		}
 	}
@@ -190,12 +190,12 @@ func GetConfigDir() (string, error) {
 func (a Agent) getTask() api.TaskPollOutput {
 	ctx := context.Background()
 
-	pollResponse, err := a.ApiClient.TaskPollWithResponse(ctx, api.TaskPollInput{
+	pollResponse, err := a.APIClient.TaskPollWithResponse(ctx, api.TaskPollInput{
 		AgentID:    a.Name,
 		PoolLabels: a.PoolLabels,
 	})
 	if err != nil {
-		slog.Error("error polling for task", "err", err)
+		slog.Error("Error polling for task", "err", err)
 	}
 
 	if pollResponse.StatusCode() == 204 {
@@ -312,7 +312,7 @@ func (a *Agent) startHeartbeat(ctx context.Context) error {
 				hbInput.TaskStatus = &a.CurrentTaskStatus
 			}
 
-			_, err := a.ApiClient.AgentHeartbeat(ctx, hbInput)
+			_, err := a.APIClient.AgentHeartbeat(ctx, hbInput)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -326,7 +326,7 @@ func (a *Agent) startHeartbeat(ctx context.Context) error {
 func (a *Agent) updateTaskStatus(ctx context.Context, taskName string, status api.TaskStatus) error {
 	slog.Info("Updating task status", "task_name", taskName, "status", status)
 
-	_, err := a.ApiClient.UpdateTask(ctx, taskName, api.UpdateTaskInput{
+	_, err := a.APIClient.UpdateTask(ctx, taskName, api.UpdateTaskInput{
 		Status: &status,
 	})
 
@@ -341,7 +341,7 @@ func (a *Agent) setCurrentTask(taskName string, status api.TaskStatus) {
 func CreateTmpResimDir() error {
 	dir := "/tmp/resim"
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		err := os.Mkdir(dir, 0700)
+		err := os.Mkdir(dir, 0o700)
 		if err != nil {
 			return err
 		}

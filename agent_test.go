@@ -1,7 +1,6 @@
 package agent_test
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"testing"
@@ -12,7 +11,7 @@ import (
 
 const defaultTestConfig = `api-host: https://api.resim.ai/worker/v1
 name: my-forklift
-pool-labels: 
+pool-labels:
   - small
   - big
 username: gimli
@@ -62,7 +61,7 @@ func (s *AgentTestSuite) TestLoadConfigFile() {
 	err := a.LoadConfig()
 	s.NoError(err)
 
-	s.Equal("https://api.resim.ai/worker/v1", a.ApiHost)
+	s.Equal("https://api.resim.ai/worker/v1", a.APIHost)
 	s.Equal("my-forklift", a.Name)
 }
 
@@ -70,8 +69,6 @@ func (s *AgentTestSuite) TestInvalidConfig() {
 	a := agent.Agent{
 		ConfigFileOverride: "/not/real/path/",
 	}
-
-	fmt.Println(a.ApiHost)
 
 	err := a.Start()
 

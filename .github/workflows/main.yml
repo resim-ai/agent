@@ -44,15 +44,15 @@ jobs:
       private-key: ${{ secrets.DEPLOYMENT_BOT_PRIVATE_KEY }}
       github-token: ${{ secrets.GITHUB_TOKEN }}
 
-  unit_test:
-    name: Unit tests and Code coverage
+  unit_tests:
+    name: Go Build, unit tests, and Code coverage
     uses: ./.github/workflows/unit-test-and-codecov.yml
     with:
       GO_VERSION: ${{ vars.GO_VERSION }}
     secrets:
       codecov-token: ${{ secrets.CODECOV_TOKEN}}
 
-  build:
+  build_container:
     name: Build and Push Container Images
     uses: ./.github/workflows/build-and-push-images.yml
     with:
@@ -61,4 +61,17 @@ jobs:
       app-id: ${{ secrets.DEPLOYMENT_BOT_APP_ID }}
       private-key: ${{ secrets.DEPLOYMENT_BOT_PRIVATE_KEY }}
 
-# TODO: Integration test https://app.asana.com/0/1207977581994839/1208362865864394/f
+  integration_tests:
+    name: Integration test
+    uses: ./.github/workflows/integration-tests.yml
+    with:
+      environment: pr-${{ github.event.pull_request.number}}
+      ref_name: ${{ github.event.pull_request.head.sha }}
+      pr: ${{ github.event.pull_request.number }}
+    secrets:
+      AGENT_TEST_PASSWORD: ${{ secrets.AGENT_TEST_PASSWORD }}
+      DEPLOYMENT_BOT_APP_ID: ${{ secrets.DEPLOYMENT_BOT_APP_ID }}
+      DEPLOYMENT_BOT_PRIVATE_KEY: ${{ secrets.DEPLOYMENT_BOT_PRIVATE_KEY }}
+      agent_password: ${{ secrets.agent_password }}
+
+# TODO: Once the repo is public, also repeat tests with `go install` as well as binary download

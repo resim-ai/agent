@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	ApiHostDefault          = "https://agentapi.resim.ai/agent/v1"
-	ApiHostKey              = "api-host"
+	APIHostDefault          = "https://agentapi.resim.ai/agent/v1"
+	APIHostKey              = "api-host"
 	AuthHostDefault         = "https://resim.us.auth0.com"
 	AuthHostKey             = "auth-host"
 	ClientIDDefault         = devClientID // TODO default to prod
@@ -51,11 +51,11 @@ func (a *Agent) LoadConfig() error {
 	// TODO: work out how to convert strings into level numbers
 	slog.SetLogLoggerLevel(slog.LevelDebug)
 
-	viper.SetDefault(ApiHostKey, ApiHostDefault)
+	viper.SetDefault(APIHostKey, APIHostDefault)
 	viper.SetDefault(AuthHostKey, AuthHostDefault)
 	viper.SetDefault(ClientIDKey, ClientIDDefault)
 
-	a.ApiHost = viper.GetString(ApiHostKey)
+	a.APIHost = viper.GetString(APIHostKey)
 	a.AuthHost = viper.GetString(AuthHostKey)
 	a.ClientID = viper.GetString(ClientIDKey)
 
@@ -70,7 +70,7 @@ func (a *Agent) LoadConfig() error {
 	a.PoolLabels = viper.GetStringSlice(PoolLabelsKey)
 
 	slog.Info("loaded config",
-		"apiHost", a.ApiHost,
+		"apiHost", a.APIHost,
 		"authHost", a.AuthHost,
 		"name", a.Name,
 		"poolLabels", a.PoolLabels,
