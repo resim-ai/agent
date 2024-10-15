@@ -3,7 +3,17 @@ on:
   pull_request:
     types:
       - closed
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to destroy
+        type: string
+        required: true
 
+permissions:
+  id-token: write
+  contents: write
+  checks: write
 
 jobs:
   stop_instance:
@@ -11,6 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TF_VAR_agent_password: "${{ secrets.agent_password }}"
+      TF_VAR_environment: "${{ inputs.environment }}"
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -52,13 +63,22 @@ jobs:
           git config --global url."https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com".insteadOf ssh://git@github.com
           terraform init
 
-      # workspace new switches to the new workspace but we want to select it and fail if we can't for whatever reason
-      - name: Terraform Workspace Select
-        working-directory: test/integration
-        id: workspace-select
-        run: terraform workspace select "pr-${{ github.event.number }}"
+      - name: Determine workspace
+        id: params
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "WORKSPACE=pr-${{ github.event.number }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "WORKSPACE=$ENVIRONMENT" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Terraform Destroy
         working-directory: test/integration
-        run: terraform apply -destroy -auto-approve -input=false
+        run: |
+          terraform workspace select ${{ steps.params.outputs.WORKSPACE }}
+          terraform apply -destroy -auto-approve -input=false
+          terraform workspace select default
+          terraform workspace delete ${{ steps.params.outputs.WORKSPACE }}
 
