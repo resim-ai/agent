@@ -34,6 +34,9 @@ const (
 	TestMCAPFile string = "test.mcap"
 	TestMP4File  string = "test.mp4"
 
+	apiCheckTimeout  = 10 * time.Minute
+	apiCheckInterval = 10 * time.Second
+
 	APIHostKey          = "api-host"
 	AuthHostKey         = "auth-host"
 	LocalImageKey       = "local-image"
@@ -84,6 +87,32 @@ func ListExpectedOutputFiles() []string {
 		"experience-container.log",
 		"metrics-worker.log",
 		"metrics-container.log",
+	}
+}
+
+func CheckAPIAvailability(ctx context.Context, endpoint string, interval time.Duration) error {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timeout reached: API is not available at %s", endpoint)
+		case <-ticker.C:
+			// Try to send a GET request to the API endpoint
+			resp, err := http.Get(endpoint)
+			if err != nil {
+				fmt.Println("Error connecting to API:", err)
+			} else {
+				defer resp.Body.Close()
+				if resp.StatusCode == http.StatusOK {
+					fmt.Println("API is available:", endpoint)
+					return nil
+				} else {
+					fmt.Printf("API response status: %d\n", resp.StatusCode)
+				}
+			}
+		}
 	}
 }
 
