@@ -68,7 +68,7 @@ jobs:
         env:
           ENVIRONMENT: ${{ inputs.environment }}
         run: |
-          if [ -z ${ENVIRONMENT+x} ]; then
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             echo "WORKSPACE=pr-${{ github.event.number }}" >> "$GITHUB_OUTPUT"
           else
             echo "WORKSPACE=$ENVIRONMENT" >> "$GITHUB_OUTPUT"
