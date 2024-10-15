@@ -76,8 +76,8 @@ jobs:
       - name: Terraform Destroy
         working-directory: test/integration
         run: |
-          terraform workspace select ${{ steps.params.outputs.ENVIRONMENT }}
+          terraform workspace select ${{ steps.params.outputs.WORKSPACE }}
           terraform apply -destroy -auto-approve -input=false
           terraform workspace select default
-          terraform workspace delete dev-env-pr-${{ steps.params.outputs.ENVIRONMENT }}
+          terraform workspace delete ${{ steps.params.outputs.WORKSPACE }}
 
