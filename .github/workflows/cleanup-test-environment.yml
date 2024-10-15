@@ -10,6 +10,11 @@ on:
         type: string
         required: true
 
+permissions:
+  id-token: write
+  contents: write
+  checks: write
+
 jobs:
   stop_instance:
     name: Stop test environment
@@ -68,13 +73,11 @@ jobs:
             echo "WORKSPACE=$ENVIRONMENT" >> "$GITHUB_OUTPUT"
           fi
 
-      # workspace new switches to the new workspace but we want to select it and fail if we can't for whatever reason
-      - name: Terraform Workspace Select
-        working-directory: test/integration
-        id: workspace-select
-        run: terraform workspace select ${{ steps.params.outputs.ENVIRONMENT }}
-
       - name: Terraform Destroy
         working-directory: test/integration
-        run: terraform apply -destroy -auto-approve -input=false
+        run: |
+          terraform workspace select ${{ steps.params.outputs.ENVIRONMENT }}
+          terraform apply -destroy -auto-approve -input=false
+          terraform workspace select default
+          terraform workspace delete dev-env-pr-${{ steps.params.outputs.ENVIRONMENT }}
 
