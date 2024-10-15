@@ -33,3 +33,12 @@
 # Local linting - requires `golangci-lint` to be installed
 @lint:
  golangci-lint run
+
+# Destroys a nominated dev environment. Use `terraform workspace list` to see available environments
+[no-cd]
+@env_kill ENV:
+  terraform workspace select {{ENV}}
+  TF_VAR_agent_password=p TF_VAR_environment={{ENV}} terraform destroy
+  terraform workspace select default
+  terraform workspace delete {{ENV}}
+  terraform workspace list
