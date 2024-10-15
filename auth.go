@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -37,37 +36,25 @@ type tokenJSON struct {
 	ExpiresIn    int32  `json:"expires_in"`
 }
 
-func (a *Agent) checkAuth(source string) error {
-	slog.Info("checking auth", "source", source)
-	var gotNewToken bool
+func (a *Agent) Token() (*oauth2.Token, error) {
 	a.TokenMutex.Lock()
 
 	a.loadCredentialCache()
-	if a.Token != nil && time.Now().After(a.Token.Expiry.Add(-10*time.Second)) && a.Token.RefreshToken != "" {
+	if a.CurrentToken != nil && time.Now().After(a.CurrentToken.Expiry.Add(-10*time.Second)) && a.CurrentToken.RefreshToken != "" {
 		token := a.authenticate(authModeRefresh)
 		if token.Valid() {
-			a.Token = token
+			a.CurrentToken = token
 		} else {
-			a.Token = a.authenticate(authModePassword)
+			a.CurrentToken = a.authenticate(authModePassword)
 		}
-		gotNewToken = true
 		a.saveCredentialCache()
-	} else if !(a.Token.Valid()) {
-		a.Token = a.authenticate(authModePassword)
-		gotNewToken = true
+	} else if !(a.CurrentToken.Valid()) {
+		a.CurrentToken = a.authenticate(authModePassword)
 		a.saveCredentialCache()
-	}
-
-	if gotNewToken {
-		newClient, err := a.getAPIClient(context.Background())
-		if err != nil {
-			slog.Error("error setting API client", "err", err)
-		}
-		a.APIClient = newClient
 	}
 	a.TokenMutex.Unlock()
 
-	return nil
+	return a.CurrentToken, nil
 }
 
 func (a *Agent) authenticate(mode AuthMode) *oauth2.Token {
@@ -94,7 +81,7 @@ func (a *Agent) authenticate(mode AuthMode) *oauth2.Token {
 		payloadVals = url.Values{
 			"grant_type":    []string{"refresh_token"},
 			"client_id":     []string{a.ClientID},
-			"refresh_token": []string{a.Token.RefreshToken},
+			"refresh_token": []string{a.CurrentToken.RefreshToken},
 		}
 	}
 
@@ -131,14 +118,14 @@ func (a *Agent) loadCredentialCache() {
 
 	data, err := os.ReadFile(path)
 	if err == nil {
-		json.Unmarshal(data, &a.Token)
+		json.Unmarshal(data, &a.CurrentToken)
 	}
 }
 
 func (a *Agent) saveCredentialCache() {
 	slog.Info("saving credential cache")
 
-	data, err := json.Marshal(a.Token)
+	data, err := json.Marshal(a.CurrentToken)
 	if err != nil {
 		log.Println("error marshaling credential cache:", err)
 		return

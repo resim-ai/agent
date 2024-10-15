@@ -39,7 +39,7 @@ type taskStatusMessage struct {
 type Agent struct {
 	APIClient          *api.ClientWithResponses
 	DockerClient       *client.Client
-	Token              *oauth2.Token
+	CurrentToken       *oauth2.Token
 	TokenMutex         sync.Mutex
 	ClientID           string
 	AuthHost           string
@@ -69,11 +69,6 @@ func (a *Agent) Start() error {
 		return err
 	}
 	defer a.DockerClient.Close()
-
-	err = a.checkAuth("startup")
-	if err != nil {
-		log.Fatal("error in authentication")
-	}
 
 	ctx := context.Background()
 	apiClient, err := a.getAPIClient(ctx)
@@ -108,8 +103,6 @@ func (a *Agent) Start() error {
 	}
 
 	for {
-		a.checkAuth("main")
-
 		task := a.getTask()
 		if task.TaskName == nil {
 			time.Sleep(10 * time.Second)
@@ -192,7 +185,7 @@ func (a *Agent) getTask() api.TaskPollOutput {
 	}
 
 	if pollResponse.StatusCode() == 204 {
-		slog.Debug("No task available", "countdown", time.Until(a.Token.Expiry))
+		slog.Debug("No task available")
 		return api.TaskPollOutput{}
 	}
 
@@ -297,8 +290,6 @@ func (a *Agent) startHeartbeat(ctx context.Context) error {
 
 	go func() {
 		for range ticker.C {
-			a.checkAuth("hb")
-
 			if a.CurrentTaskName != "" {
 				hbInput.TaskName = &a.CurrentTaskName
 			}
@@ -310,7 +301,6 @@ func (a *Agent) startHeartbeat(ctx context.Context) error {
 			if err != nil {
 				log.Fatal(err)
 			}
-			// slog.Info("hb", "url", res.Request.URL, "status", res.StatusCode, "task_name", a.CurrentTaskName, "task_status", a.CurrentTaskStatus)
 		}
 	}()
 
@@ -344,14 +334,7 @@ func CreateTmpResimDir() error {
 }
 
 func (a *Agent) getAPIClient(ctx context.Context) (*api.ClientWithResponses, error) {
-	var tokenSource oauth2.TokenSource
-	tokenSource = oauth2.ReuseTokenSource(a.Token, tokenSource)
-	oauthClient := oauth2.NewClient(ctx, tokenSource)
-	token, err := tokenSource.Token()
-	if err != nil {
-		return &api.ClientWithResponses{}, err
-	}
-	a.Token = token
+	oauthClient := oauth2.NewClient(ctx, a)
 	APIClient, err := api.NewClientWithResponses(a.APIHost, api.WithHTTPClient(oauthClient))
 	if err != nil {
 		return &api.ClientWithResponses{}, err
