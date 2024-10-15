@@ -21,6 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TF_VAR_agent_password: "${{ secrets.agent_password }}"
+      TF_VAR_environment: "${{ inputs.environment }}"
     steps:
       - name: Checkout
         uses: actions/checkout@v3
