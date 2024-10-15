@@ -107,8 +107,7 @@ func (a *Agent) authenticate(mode AuthMode) *oauth2.Token {
 		AccessToken:  tj.AccessToken,
 		TokenType:    tj.TokenType,
 		RefreshToken: tj.RefreshToken,
-		// Expiry:       time.Now().Add(time.Duration(tj.ExpiresIn) * time.Second),
-		Expiry: time.Now().Add(time.Duration(60) * time.Second),
+		Expiry:       time.Now().Add(time.Duration(tj.ExpiresIn) * time.Second),
 	}
 }
 
