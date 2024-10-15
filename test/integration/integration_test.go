@@ -40,6 +40,15 @@ func TestAgentTestSuite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), apiCheckTimeout)
+	defer cancel()
+
+	err = CheckAPIAvailability(ctx, apiHost, apiCheckInterval)
+	if err != nil {
+		t.Fatal(err)
+	} else {
+		fmt.Println("API is up")
+	}
 
 	suite.Run(t, s)
 }
