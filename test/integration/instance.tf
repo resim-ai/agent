@@ -76,7 +76,7 @@ data "cloudinit_config" "config" {
         api_host       = "https://${local.api_host}/agent/v1"
         pool_labels    = "agent-test-${terraform.workspace}"
         agent_name     = "barry"
-        agent_version  = startswith(var.environment, "dev") ? "main" : terraform.workspace
+        agent_version  = startswith(var.environment, "pr") ? terraform.workspace : "main"
         agent_username = "e2e.resim.ai"
         agent_password = var.agent_password
 
