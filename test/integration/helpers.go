@@ -319,10 +319,10 @@ func (s *AgentTestSuite) createS3TestExperience() {
 
 func (s *AgentTestSuite) createLocalTestExperiences() {
 	// Create an experience:
-	experienceName1 := fmt.Sprintf("Test Experience %v", uuid.New())
+	experienceName1 := "experience_1"
 	// experienceName2 := fmt.Sprintf("Test Experience %v", uuid.New())
 
-	testLocation1 := "/test_experience_data/experience_1"
+	testLocation1 := "/test_experience_data/experience_1/"
 	// testLocation2 := "/test_experience_data/experience_1"
 
 	createExperienceRequest := api.CreateExperienceInput{
