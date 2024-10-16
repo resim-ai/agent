@@ -80,7 +80,7 @@ data "cloudinit_config" "config" {
         agent_username = "e2e.resim.ai"
         agent_password = var.agent_password
 
-        cloudwatch_agent_config = filebase64("${path.module}/templates/amazon-cloudwatch-agent.json")
+        cloudwatch_agent_config = base64encode(templatefile("${path.module}/templates/amazon-cloudwatch-agent.json", { environment = var.environment }))
       }
     )
   }
