@@ -30,6 +30,9 @@ const (
 	// A pair of constants used for creating actual experience data for test experiences
 	ExpectedExperienceNameFile       string = "experience_name.txt"
 	ExpectedExperienceNameBase64File string = "experience_name.base64"
+
+	experienceBuildURI string = "909785973729.dkr.ecr.us-east-1.amazonaws.com/rerun-end-to-end-test-experience-build:latest"
+
 	// Output File Names
 	TestMCAPFile string = "test.mcap"
 	TestMP4File  string = "test.mp4"
