@@ -332,21 +332,6 @@ func (s *AgentTestSuite) createLocalTestExperiences() {
 		os.Exit(1)
 	}
 	s.localExperiences = append(s.localExperiences, createExperienceResponse.JSON201.ExperienceID)
-	// createExperienceRequest = api.CreateExperienceInput{
-	// 	Name:        experienceName2,
-	// 	Description: "description",
-	// 	Location:    testLocation2,
-	// }
-	// createExperienceResponse, err = s.APIClient.CreateExperienceWithResponse(
-	// 	context.Background(),
-	// 	s.projectID,
-	// 	createExperienceRequest,
-	// )
-	// if err != nil {
-	// 	slog.Error("Unable to create experience", "error", err)
-	// 	os.Exit(1)
-	// }
-	// s.localExperiences = append(s.localExperiences, createExperienceResponse.JSON201.ExperienceID)
 }
 
 // Generates an experience and uploads it to an s3 path
