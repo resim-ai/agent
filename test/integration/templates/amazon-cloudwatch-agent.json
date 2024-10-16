@@ -35,6 +35,13 @@
             "retention_in_days": 7
           },
           {
+            "file_path": "/tmp/resim/**/*.log",
+            "log_group_name": "/agent-integration-tests/",
+            "log_stream_name": "/customer/${environment}-{instance_id}",
+            "timezone": "Local",
+            "retention_in_days": 7
+          },
+          {
             "file_path": "/resim/agent.log",
             "log_group_name": "/agent-integration-tests/",
             "log_stream_name": "/resim/${environment}-{instance_id}",
