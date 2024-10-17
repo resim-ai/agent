@@ -16,7 +16,7 @@ func (s *AgentTestSuite) SetupTest() {
 	s.createTestProject()
 	s.createTestSystem()
 	s.createTestBranch()
-	s.buildIDS3 = s.createBuild("public.ecr.aws/docker/library/hello-world:latest")
+	s.buildIDS3 = s.createBuild(experienceBuildURI)
 	s.buildIDLocal = s.createBuild(viper.GetViper().GetString(LocalImageKey))
 	s.createMetricsBuild()
 }
