@@ -68,6 +68,7 @@ jobs:
           aws-region: us-east-1
 
       - name: Upload binary to S3
+        if: steps.go-build-cache.outputs.cache-hit != 'true'
         run: aws s3 cp ./agent-* s3://resim-binaries/agent/
 
       - name: Test and Run coverage

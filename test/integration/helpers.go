@@ -30,6 +30,9 @@ const (
 	// A pair of constants used for creating actual experience data for test experiences
 	ExpectedExperienceNameFile       string = "experience_name.txt"
 	ExpectedExperienceNameBase64File string = "experience_name.base64"
+
+	experienceBuildURI string = "909785973729.dkr.ecr.us-east-1.amazonaws.com/rerun-end-to-end-test-experience-build:latest"
+
 	// Output File Names
 	TestMCAPFile string = "test.mcap"
 	TestMP4File  string = "test.mp4"
@@ -82,11 +85,16 @@ func Ptr[T any](t T) *T {
 
 func ListExpectedOutputFiles() []string {
 	return []string{
+		TestMCAPFile,
+		TestMP4File,
 		"metrics.binproto",
+		ExpectedExperienceNameFile,
+		ExpectedExperienceNameBase64File,
 		"experience-worker.log",
 		"experience-container.log",
 		"metrics-worker.log",
 		"metrics-container.log",
+		"test_config.json",
 	}
 }
 
@@ -311,10 +319,10 @@ func (s *AgentTestSuite) createS3TestExperience() {
 
 func (s *AgentTestSuite) createLocalTestExperiences() {
 	// Create an experience:
-	experienceName1 := fmt.Sprintf("Test Experience %v", uuid.New())
+	experienceName1 := "experience_1"
 	// experienceName2 := fmt.Sprintf("Test Experience %v", uuid.New())
 
-	testLocation1 := "/test_experience_data/experience_1"
+	testLocation1 := "/test_experience_data/experience_1/"
 	// testLocation2 := "/test_experience_data/experience_1"
 
 	createExperienceRequest := api.CreateExperienceInput{
@@ -332,21 +340,6 @@ func (s *AgentTestSuite) createLocalTestExperiences() {
 		os.Exit(1)
 	}
 	s.localExperiences = append(s.localExperiences, createExperienceResponse.JSON201.ExperienceID)
-	// createExperienceRequest = api.CreateExperienceInput{
-	// 	Name:        experienceName2,
-	// 	Description: "description",
-	// 	Location:    testLocation2,
-	// }
-	// createExperienceResponse, err = s.APIClient.CreateExperienceWithResponse(
-	// 	context.Background(),
-	// 	s.projectID,
-	// 	createExperienceRequest,
-	// )
-	// if err != nil {
-	// 	slog.Error("Unable to create experience", "error", err)
-	// 	os.Exit(1)
-	// }
-	// s.localExperiences = append(s.localExperiences, createExperienceResponse.JSON201.ExperienceID)
 }
 
 // Generates an experience and uploads it to an s3 path

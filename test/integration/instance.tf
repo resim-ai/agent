@@ -80,7 +80,7 @@ data "cloudinit_config" "config" {
         agent_username = "e2e.resim.ai"
         agent_password = var.agent_password
 
-        cloudwatch_agent_config = filebase64("${path.module}/templates/amazon-cloudwatch-agent.json")
+        cloudwatch_agent_config = base64encode(templatefile("${path.module}/templates/amazon-cloudwatch-agent.json", { environment = var.environment }))
       }
     )
   }
@@ -158,6 +158,7 @@ data "aws_iam_policy_document" "this" {
     ]
     resources = [
       "arn:aws:ecr:us-east-1:909785973729:repository/agent-test",
+      "arn:aws:ecr:us-east-1:909785973729:repository/rerun-end-to-end-test-experience-build",
     ]
   }
 
