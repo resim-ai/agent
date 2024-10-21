@@ -283,7 +283,7 @@ jobs:
 
   deployment_bot_comment_test:
     name: Deployment Bot Comment - Test Complete
-    if: ${{ startsWith(inputs.environment, 'dev' )}}
+    if: ${{ !startsWith(inputs.environment, 'staging' )}}
     needs: [test]
     uses: resim-ai/workflows/.github/workflows/create-update-deployment-bot-comment.yml@v2
     with:
