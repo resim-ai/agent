@@ -61,4 +61,4 @@ runcmd:
     # Start the docker agent
     mkdir /tmp/resim
     aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 909785973729.dkr.ecr.us-east-1.amazonaws.com
-    docker run -v /tmp/resim:/tmp/resim -v /resim/docker:/resim -v /var/run/docker.sock:/var/run/docker.sock 909785973729.dkr.ecr.us-east-1.amazonaws.com/agent:${agent_version}
+    nohup docker run -v /tmp/resim:/tmp/resim -v /resim/docker:/resim -v /var/run/docker.sock:/var/run/docker.sock 909785973729.dkr.ecr.us-east-1.amazonaws.com/agent:${agent_version} &
