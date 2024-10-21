@@ -405,12 +405,20 @@ func Base64EncodeString(input string) []byte {
 	return base64Input
 }
 
-func (s *AgentTestSuite) createAndAwaitBatch(buildID uuid.UUID, experiences []uuid.UUID) api.Batch {
+func (s *AgentTestSuite) createAndAwaitBatch(buildID uuid.UUID, experiences []uuid.UUID, isDocker bool) api.Batch {
+	var poolLabels []string
+	if isDocker {
+		poolLabels = []string{
+			s.poolLabels[0] + "-docker",
+		}
+	} else {
+		poolLabels = s.poolLabels
+	}
 	// Create a batch:
 	createBatchRequest := api.BatchInput{
 		ExperienceIDs: &experiences,
 		BuildID:       &buildID,
-		PoolLabels:    &s.poolLabels,
+		PoolLabels:    &poolLabels,
 		Parameters: &api.BatchParameters{
 			"buildID":         buildID.String(),
 			"repeatedBuildID": buildID.String(),

@@ -56,7 +56,7 @@ func TestAgentTestSuite(t *testing.T) {
 // Test the agent with a batch where the experiences are in S3
 func (s *AgentTestSuite) TestAgentWithS3Experience() {
 	s.createS3TestExperience()
-	batch := s.createAndAwaitBatch(s.buildIDS3, s.s3Experiences)
+	batch := s.createAndAwaitBatch(s.buildIDS3, s.s3Experiences, false)
 	jobsResponse, err := s.APIClient.ListJobsWithResponse(
 		context.Background(),
 		s.projectID,
@@ -96,7 +96,47 @@ func (s *AgentTestSuite) TestAgentWithS3Experience() {
 // Test the agent with a batch where the experiences are baked into the image
 func (s *AgentTestSuite) TestAgentWithLocalExperience() {
 	s.createLocalTestExperiences()
-	batch := s.createAndAwaitBatch(s.buildIDLocal, s.localExperiences)
+	batch := s.createAndAwaitBatch(s.buildIDLocal, s.localExperiences, false)
+	jobsResponse, err := s.APIClient.ListJobsWithResponse(
+		context.Background(),
+		s.projectID,
+		*batch.BatchID,
+		&api.ListJobsParams{
+			PageSize: Ptr(100),
+		})
+
+	s.NoError(err)
+	s.Len(*jobsResponse.JSON200.Jobs, 1)
+	expectedOutputFiles := ListExpectedOutputFiles()
+
+	printLogs := *batch.Status != api.BatchStatusSUCCEEDED // we will print urls to logs if the batch did not succeed
+	// Finally: for every job in the batch, list the logs:
+	for _, job := range *jobsResponse.JSON200.Jobs {
+		fmt.Printf("Checking logs for Job ID: %v\n", *job.JobID)
+		listLogsResponse, err := s.APIClient.ListJobLogsForJobWithResponse(
+			context.Background(),
+			s.projectID,
+			*batch.BatchID,
+			*job.JobID,
+			&api.ListJobLogsForJobParams{
+				PageSize: Ptr(100),
+			},
+		)
+		s.NoError(err)
+		s.Len(*listLogsResponse.JSON200.Logs, len(expectedOutputFiles))
+		for _, log := range *listLogsResponse.JSON200.Logs {
+			s.Contains(expectedOutputFiles, *log.FileName)
+			if printLogs {
+				fmt.Printf(">> Log: %v , Presigned URL: %v \n", *log.FileName, *log.LogOutputLocation)
+			}
+		}
+	}
+}
+
+// Test the agent with a batch where the experiences are in S3
+func (s *AgentTestSuite) TestDockerAgentWithS3Experience() {
+	s.createS3TestExperience()
+	batch := s.createAndAwaitBatch(s.buildIDS3, s.s3Experiences, true)
 	jobsResponse, err := s.APIClient.ListJobsWithResponse(
 		context.Background(),
 		s.projectID,
