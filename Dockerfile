@@ -60,4 +60,5 @@ RUN \
 FROM scratch AS agent
 
 COPY --from=base --chmod=755 /dist /
+COPY --from=base /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 ENTRYPOINT ["/agent"]
