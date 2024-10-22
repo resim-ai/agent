@@ -27,7 +27,8 @@ func TestAgentSuite(s *testing.T) {
 }
 
 func createConfigFile() string {
-	f, err := os.CreateTemp("/tmp", "config.yaml")
+	t, _ := os.MkdirTemp("/tmp", "")
+	f, err := os.Create(filepath.Join(t, "config.yaml"))
 	if err != nil {
 		log.Fatal("error creating temp file")
 	}

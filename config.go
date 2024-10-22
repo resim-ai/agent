@@ -33,7 +33,7 @@ func (a *Agent) LoadConfig() error {
 	viper.SetConfigName("config") // name of config file (without extension)
 	viper.SetConfigType("yaml")   // REQUIRED if the config file does not have the extension in the name
 	if a.ConfigDirOverride != "" {
-		viper.AddConfigPath(a.ConfigDirOverride)
+		viper.SetConfigFile(filepath.Join(a.ConfigDirOverride, "config.yaml"))
 	} else {
 		viper.AddConfigPath(ConfigPath)
 	}
