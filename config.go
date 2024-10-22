@@ -25,6 +25,8 @@ const (
 	AgentNameKey            = "name"
 	EnvPrefix               = "RERUN_AGENT"
 	LogLevelKey             = "log-level"
+	LogFilesizeKey          = "log-max-filesize"
+	LogFilesizeDefault      = 500
 	ConfigPath              = "$HOME/resim"
 	CredentialCacheFilename = "cache.json"
 )
@@ -49,6 +51,8 @@ func (a *Agent) LoadConfig() error {
 
 	viper.SetDefault(LogLevelKey, "info")
 	a.LogLevel = viper.GetString(LogLevelKey)
+
+	viper.SetDefault(LogFilesizeKey, LogFilesizeDefault)
 
 	viper.SetDefault(APIHostKey, APIHostDefault)
 	viper.SetDefault(AuthHostKey, AuthHostDefault)
@@ -91,7 +95,7 @@ func (a *Agent) InitializeLogging() error {
 	}
 	logFileWriter := &lumberjack.Logger{
 		Filename:   fmt.Sprintf("%v/agent.log", logDir),
-		MaxSize:    500,
+		MaxSize:    viper.GetInt(LogFilesizeKey),
 		MaxBackups: 3,
 		MaxAge:     28,
 		Compress:   true,

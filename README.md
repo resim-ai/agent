@@ -36,6 +36,8 @@ password:
 ### Optional 
 # Log level - debug, info, warn, error (default: info)
 log-level: info
+# Size in MB of log file (default: 500), note that 3 compressed backups are kept
+log-max-filesize: 200
 ```
 
 Note that the `pool-labels` are an OR/ANY selection, that is, an agent running with the labels `big` and `small` will run jobs tagged with either of those labels.
