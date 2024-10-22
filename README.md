@@ -23,7 +23,7 @@ By default, the Agent loads config from `~/resim/config.yaml`, caches credential
 
 The configuration file has the following options:
 
-```
+```yaml
 ### Required
 # Set a name for the agent which will be shown in ReSim
 name: my-robot-arm
