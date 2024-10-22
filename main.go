@@ -48,6 +48,7 @@ type Agent struct {
 	PoolLabels        []string
 	ConfigDirOverride string
 	LogDirOverride    string
+	LogLevel          string
 	Status            agentStatus
 	CurrentTaskName   string
 	CurrentTaskStatus api.TaskStatus
@@ -56,19 +57,17 @@ type Agent struct {
 type Task api.TaskPollOutput
 
 func (a *Agent) Start() error {
-	err := a.InitializeLogging()
-	if err != nil {
-		slog.Error("error initializing logging", "err", err)
-		return err
-	}
-
-	err = a.LoadConfig()
+	err := a.LoadConfig()
 	if err != nil {
 		slog.Error("error loading config", "err", err)
 		return err
 	}
 
-	// TODO: check apiHost is available
+	err = a.InitializeLogging()
+	if err != nil {
+		slog.Error("error initializing logging", "err", err)
+		return err
+	}
 
 	err = a.initializeDockerClient()
 	if err != nil {

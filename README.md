@@ -24,6 +24,7 @@ By default, the Agent loads config from `~/resim/config.yaml`, caches credential
 The configuration file has the following options:
 
 ```
+### Required
 # Set a name for the agent which will be shown in ReSim
 name: my-robot-arm
 # Set the labels for which you would like this agent to run jobs (see below)
@@ -32,6 +33,9 @@ pool-labels:
 # These credentials for authenticating with the ReSim API will be provided by ReSim
 username: 
 password: 
+### Optional 
+# Log level - debug, info, warn, error (default: info)
+log-level: info
 ```
 
 Note that the `pool-labels` are an OR/ANY selection, that is, an agent running with the labels `big` and `small` will run jobs tagged with either of those labels.

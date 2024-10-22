@@ -47,9 +47,8 @@ func (a *Agent) LoadConfig() error {
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 
-	viper.SetDefault(LogLevelKey, "0") // info, default
-	// TODO: work out how to convert strings into level numbers
-	slog.SetLogLoggerLevel(slog.LevelDebug)
+	viper.SetDefault(LogLevelKey, "info")
+	a.LogLevel = viper.GetString(LogLevelKey)
 
 	viper.SetDefault(APIHostKey, APIHostDefault)
 	viper.SetDefault(AuthHostKey, AuthHostDefault)
@@ -104,8 +103,23 @@ func (a *Agent) InitializeLogging() error {
 		return err
 	}
 
+	var slogLevel slog.Level
+	switch a.LogLevel {
+	case "debug":
+		slogLevel = slog.LevelDebug
+	case "info":
+		slogLevel = slog.LevelInfo
+	case "error":
+		slogLevel = slog.LevelError
+	case "warn":
+		slogLevel = slog.LevelWarn
+	default:
+		slog.Warn("invalid log level set in config")
+		slogLevel = slog.LevelDebug
+	}
+
 	logWriters := io.MultiWriter(os.Stdout, logFileWriter)
-	logHandler := slog.NewJSONHandler(logWriters, &slog.HandlerOptions{Level: slog.LevelDebug})
+	logHandler := slog.NewTextHandler(logWriters, &slog.HandlerOptions{Level: slogLevel})
 	logger := slog.New(logHandler)
 	slog.SetDefault(logger)
 
