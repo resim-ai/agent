@@ -3,6 +3,7 @@ package agent_test
 import (
 	"log"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/resim-ai/agent"
@@ -55,7 +56,7 @@ func (s *AgentTestSuite) TestLoadConfigFile() {
 	defer os.Remove(configFile)
 
 	a := agent.Agent{
-		ConfigFileOverride: configFile,
+		ConfigDirOverride: filepath.Dir(configFile),
 	}
 
 	err := a.LoadConfig()
@@ -67,7 +68,7 @@ func (s *AgentTestSuite) TestLoadConfigFile() {
 
 func (s *AgentTestSuite) TestInvalidConfig() {
 	a := agent.Agent{
-		ConfigFileOverride: "/not/real/path/",
+		ConfigDirOverride: "/not/real/path/",
 	}
 
 	err := a.Start()
