@@ -18,8 +18,9 @@ import (
 )
 
 const (
-	devClientID = "xJv0jqeP7QdPOsUidorgDlj4Mi74gVEW"
-	audience    = "https://api.resim.ai"
+	devClientID  = "xJv0jqeP7QdPOsUidorgDlj4Mi74gVEW"
+	prodClientID = "PyfkASRBxceY9dRKYkfDJupRV40XA95N"
+	audience     = "https://api.resim.ai"
 )
 
 type AuthMode string
@@ -112,10 +113,14 @@ func (a *Agent) authenticate(mode AuthMode) *oauth2.Token {
 }
 
 func (a *Agent) loadCredentialCache() {
-	homedir, _ := os.UserHomeDir()
-	path := strings.ReplaceAll(filepath.Join(ConfigPath, CredentialCacheFilename), "$HOME", homedir)
+	dir, err := a.GetConfigDir()
+	if err != nil {
+		slog.Error("error finding config dir", "err", err)
+	}
 
-	data, err := os.ReadFile(path)
+	cacheFilePath := filepath.Join(dir, CredentialCacheFilename)
+
+	data, err := os.ReadFile(cacheFilePath)
 	if err == nil {
 		json.Unmarshal(data, &a.CurrentToken)
 	}
@@ -130,7 +135,7 @@ func (a *Agent) saveCredentialCache() {
 		return
 	}
 
-	expectedDir, err := GetConfigDir()
+	expectedDir, err := a.GetConfigDir()
 	if err != nil {
 		return
 	}

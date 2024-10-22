@@ -3,6 +3,7 @@ package agent_test
 import (
 	"log"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/resim-ai/agent"
@@ -26,7 +27,8 @@ func TestAgentSuite(s *testing.T) {
 }
 
 func createConfigFile() string {
-	f, err := os.CreateTemp("/tmp", "config.yaml")
+	t, _ := os.MkdirTemp("/tmp", "")
+	f, err := os.Create(filepath.Join(t, "config.yaml"))
 	if err != nil {
 		log.Fatal("error creating temp file")
 	}
@@ -55,7 +57,7 @@ func (s *AgentTestSuite) TestLoadConfigFile() {
 	defer os.Remove(configFile)
 
 	a := agent.Agent{
-		ConfigFileOverride: configFile,
+		ConfigDirOverride: filepath.Dir(configFile),
 	}
 
 	err := a.LoadConfig()
@@ -67,7 +69,7 @@ func (s *AgentTestSuite) TestLoadConfigFile() {
 
 func (s *AgentTestSuite) TestInvalidConfig() {
 	a := agent.Agent{
-		ConfigFileOverride: "/not/real/path/",
+		ConfigDirOverride: "/not/real/path/",
 	}
 
 	err := a.Start()

@@ -37,19 +37,21 @@ type taskStatusMessage struct {
 }
 
 type Agent struct {
-	APIClient          *api.ClientWithResponses
-	DockerClient       *client.Client
-	CurrentToken       *oauth2.Token
-	TokenMutex         sync.Mutex
-	ClientID           string
-	AuthHost           string
-	APIHost            string
-	Name               string
-	PoolLabels         []string
-	ConfigFileOverride string
-	Status             agentStatus
-	CurrentTaskName    string
-	CurrentTaskStatus  api.TaskStatus
+	APIClient         *api.ClientWithResponses
+	DockerClient      *client.Client
+	CurrentToken      *oauth2.Token
+	TokenMutex        sync.Mutex
+	ClientID          string
+	AuthHost          string
+	APIHost           string
+	Name              string
+	PoolLabels        []string
+	ConfigDirOverride string
+	LogDirOverride    string
+	LogLevel          string
+	Status            agentStatus
+	CurrentTaskName   string
+	CurrentTaskStatus api.TaskStatus
 }
 
 type Task api.TaskPollOutput
@@ -61,7 +63,11 @@ func (a *Agent) Start() error {
 		return err
 	}
 
-	// TODO: check apiHost is available
+	err = a.InitializeLogging()
+	if err != nil {
+		slog.Error("error initializing logging", "err", err)
+		return err
+	}
 
 	err = a.initializeDockerClient()
 	if err != nil {
@@ -160,8 +166,13 @@ func (a *Agent) pullImage(ctx context.Context, targetImage string) error {
 	return nil
 }
 
-func GetConfigDir() (string, error) {
-	expectedDir := os.ExpandEnv(ConfigPath)
+func (a *Agent) GetConfigDir() (string, error) {
+	var expectedDir string
+	if a.ConfigDirOverride != "" {
+		expectedDir = a.ConfigDirOverride
+	} else {
+		expectedDir = os.ExpandEnv(ConfigPath)
+	}
 	// Check first if the directory exists, and if it does not, create it:
 	if _, err := os.Stat(expectedDir); os.IsNotExist(err) {
 		err := os.Mkdir(expectedDir, 0o700)
@@ -184,14 +195,15 @@ func (a *Agent) getTask() api.TaskPollOutput {
 		slog.Error("Error polling for task", "err", err)
 	}
 
-	if pollResponse.StatusCode() == 204 {
+	switch pollResponse.StatusCode() {
+	case 204:
 		slog.Debug("No task available")
 		return api.TaskPollOutput{}
-	}
-
-	if pollResponse.StatusCode() == 200 {
+	case 200:
 		task := pollResponse.JSON200
 		return *task
+	default:
+		slog.Error("error polling for task", "err", pollResponse.StatusCode())
 	}
 
 	return api.TaskPollOutput{}
