@@ -1,6 +1,6 @@
 ---
 name: Integration tests
-run-name: "ReRun PR #${{ inputs.pr }} - agent integration tests"
+run-name: "ReRun PR #${{ inputs.environment }} - agent integration tests"
 
 on:  #trunk-ignore(yamllint/truthy)
   workflow_call:
@@ -38,7 +38,6 @@ on:  #trunk-ignore(yamllint/truthy)
         type: string
       pr:
         description: Pass through github.event.pull_request.number
-        required: true
         type: string
 
 permissions:
@@ -284,6 +283,7 @@ jobs:
 
   deployment_bot_comment_test:
     name: Deployment Bot Comment - Test Complete
+    if: ${{ !startsWith(inputs.environment, 'staging' )}}
     needs: [test]
     uses: resim-ai/workflows/.github/workflows/create-update-deployment-bot-comment.yml@v2
     with:

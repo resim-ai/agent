@@ -34,6 +34,17 @@ write_files:
         - ${pool_labels}
       username: ${agent_username}
       password: ${agent_password}
+  - path: /resim/docker/config
+    owner: root:root
+    permissions: '0644'
+    content: |
+      auth-host: ${auth_host}
+      api-host: ${api_host}
+      name: ${agent_name}-docker
+      pool-labels:
+        - ${pool_labels}-docker
+      username: ${agent_username}
+      password: ${agent_password}
 
 runcmd:
   - wget https://s3.amazonaws.com/amazoncloudwatch-agent/debian/amd64/latest/amazon-cloudwatch-agent.deb
@@ -44,5 +55,10 @@ runcmd:
     aws s3 cp s3://resim-binaries/agent/agent-linux-amd64-${agent_version} /usr/local/bin/agent
     chmod +x /usr/local/bin/agent
 
-    # Start the agent
+    # Start the agent binary
     nohup agent > /resim/agent.log 2>&1 &
+
+    # Start the docker agent
+    mkdir /tmp/resim
+    aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 909785973729.dkr.ecr.us-east-1.amazonaws.com
+    nohup docker run -v /tmp/resim:/tmp/resim -v /resim/docker:/resim -v /var/run/docker.sock:/var/run/docker.sock 909785973729.dkr.ecr.us-east-1.amazonaws.com/agent:${agent_version} &
