@@ -96,6 +96,7 @@ func ListExpectedOutputFiles() []string {
 		"metrics-worker.log",
 		"metrics-container.log",
 		"test_config.json",
+		"test_file.txt",
 	}
 }
 
