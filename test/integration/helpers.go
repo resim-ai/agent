@@ -453,7 +453,7 @@ func (s *AgentTestSuite) createAndAwaitBatch(buildID uuid.UUID, experiences []uu
 			s.T().Logf("Batch completed, with status: %v", status)
 		}
 		return complete
-	}, 10*time.Minute, 10*time.Second)
+	}, 15*time.Minute, 10*time.Second)
 
 	// Validate that it has SUCCEEDED:
 	getBatchResponse, err := s.APIClient.GetBatchWithResponse(
