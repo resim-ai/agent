@@ -23,7 +23,7 @@ write_files:
     owner: root:root
     permissions: '0644'
     content: ${cloudwatch_agent_config}
-  - path: /root/resim/config
+  - path: /resim/config
     owner: root:root
     permissions: '0644'
     content: |
@@ -34,7 +34,7 @@ write_files:
         - ${pool_labels}
       username: ${agent_username}
       password: ${agent_password}
-  - path: /root/resim/docker/config
+  - path: /resim/docker/config
     owner: root:root
     permissions: '0644'
     content: |
@@ -56,9 +56,9 @@ runcmd:
     chmod +x /usr/local/bin/agent
 
     # Start the agent binary
-    nohup agent > /root/resim/agent.log 2>&1 &
+    nohup agent > /resim/agent.log 2>&1 &
 
     # Start the docker agent
     mkdir /tmp/resim
     aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 909785973729.dkr.ecr.us-east-1.amazonaws.com
-    nohup docker run -v /tmp/resim:/tmp/resim -v /root/resim/docker:/root/resim -v /var/run/docker.sock:/var/run/docker.sock 909785973729.dkr.ecr.us-east-1.amazonaws.com/agent:${agent_version} &
+    nohup docker run -v /tmp/resim:/tmp/resim -v /resim/docker:/resim -v /var/run/docker.sock:/var/run/docker.sock 909785973729.dkr.ecr.us-east-1.amazonaws.com/agent:${agent_version} &
