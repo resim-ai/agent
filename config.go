@@ -32,16 +32,15 @@ const (
 )
 
 func (a *Agent) LoadConfig() error {
-	viper.SetConfigName("config") // name of config file (without extension)
-	viper.SetConfigType("yaml")   // REQUIRED if the config file does not have the extension in the name
-	if a.ConfigDirOverride != "" {
-		viper.SetConfigFile(filepath.Join(a.ConfigDirOverride, "config.yaml"))
-	} else {
-		viper.AddConfigPath(ConfigPath)
+	configDir, err := a.GetConfigDir()
+	if err != nil {
+		slog.Error("error getting config dir", "err", err)
+		return err
 	}
+	viper.SetConfigFile(filepath.Join(configDir, "config.yaml"))
 
-	err := viper.ReadInConfig() // Find and read the config file
-	if err != nil {             // Handle errors reading the config file
+	err = viper.ReadInConfig() // Find and read the config file
+	if err != nil {            // Handle errors reading the config file
 		return err
 	}
 
@@ -102,7 +101,7 @@ func (a *Agent) InitializeLogging() error {
 	}
 
 	// test write to check permissions on the file
-	_, err := logFileWriter.Write([]byte("ReSim Agent Log"))
+	_, err := logFileWriter.Write([]byte("ReSim Agent Log\n"))
 	if err != nil {
 		return err
 	}
