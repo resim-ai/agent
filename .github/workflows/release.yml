@@ -16,7 +16,7 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: ${{ vars.GO_VERSION }}
-        cache: true
+        cache: false
 
     - name: Go Build Cache
       id: go-build-cache
