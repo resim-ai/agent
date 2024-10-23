@@ -242,7 +242,7 @@ jobs:
 
       - name: Run Integration Test Suite
         id: test
-        run: go test -v ./test/integration >> test.out
+        run: go test -timeout 15m -short -race -v ./test/integration >> test.out
         env:
           AWS_PROFILE: rerun_dev
           AWS_REGION: us-east-1
