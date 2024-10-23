@@ -32,6 +32,7 @@ const (
 	ExpectedExperienceNameBase64File string = "experience_name.base64"
 
 	experienceBuildURI string = "909785973729.dkr.ecr.us-east-1.amazonaws.com/rerun-end-to-end-test-experience-build:latest"
+	metricsBuildURI    string = "909785973729.dkr.ecr.us-east-1.amazonaws.com/rerun-end-to-end-test-metrics-build:latest"
 
 	// Output File Names
 	TestMCAPFile string = "test.mcap"
@@ -275,7 +276,7 @@ func (s *AgentTestSuite) createBuild(imageURI string) uuid.UUID {
 }
 
 func (s *AgentTestSuite) createMetricsBuild() {
-	imageURI := "public.ecr.aws/docker/library/hello-world:latest"
+	imageURI := metricsBuildURI
 	metricsBuildName := fmt.Sprintf("Test Metrics Build %v", uuid.New())
 	createMetricsBuildRequest := api.CreateMetricsBuildInput{
 		Name:     metricsBuildName,
