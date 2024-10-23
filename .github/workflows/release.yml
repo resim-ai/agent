@@ -33,17 +33,14 @@ jobs:
       run: go get .
 
     - name: Build for linux-amd64
-      if: steps.go-build-cache.outputs.cache-hit != 'true'
       run: go build -o ./agent-linux-amd64 -buildvcs=false ./cmd
 
     - name: Build for linux-arm64
-      if: steps.go-build-cache.outputs.cache-hit != 'true'
       run: go build -o ./agent-linux-arm64 -buildvcs=false ./cmd
       env:
         GOARCH: arm64
 
     - name: Build for darwin-arm64
-      if: steps.go-build-cache.outputs.cache-hit != 'true'
       run: go build -o ./agent-darwin-arm64 -buildvcs=false ./cmd
       env:
         GOARCH: arm64
