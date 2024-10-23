@@ -10,7 +10,7 @@ See [the Agent page on our docs site](https://docs.resim.ai/guides/agent) for mo
 
 Install Docker (e.g. https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository)
 
-```
+```shell
 sudo chgrp docker /run/containerd/containerd.sock
 ```
 
