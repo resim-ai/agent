@@ -97,6 +97,7 @@ func ListExpectedOutputFiles() []string {
 		"metrics-container.log",
 		"test_config.json",
 		"test_file.txt",
+		"metrics.binproto", // This is here twice because it's also regsitered by metrics job
 	}
 }
 
