@@ -32,6 +32,7 @@ const (
 	ExpectedExperienceNameBase64File string = "experience_name.base64"
 
 	experienceBuildURI string = "909785973729.dkr.ecr.us-east-1.amazonaws.com/rerun-end-to-end-test-experience-build:latest"
+	metricsBuildURI    string = "909785973729.dkr.ecr.us-east-1.amazonaws.com/rerun-end-to-end-test-metrics-build:latest"
 
 	// Output File Names
 	TestMCAPFile string = "test.mcap"
@@ -95,6 +96,8 @@ func ListExpectedOutputFiles() []string {
 		"metrics-worker.log",
 		"metrics-container.log",
 		"test_config.json",
+		"test_file.txt",
+		"metrics.binproto", // This is here twice because it's also regsitered by metrics job
 	}
 }
 
@@ -275,7 +278,7 @@ func (s *AgentTestSuite) createBuild(imageURI string) uuid.UUID {
 }
 
 func (s *AgentTestSuite) createMetricsBuild() {
-	imageURI := "public.ecr.aws/docker/library/hello-world:latest"
+	imageURI := metricsBuildURI
 	metricsBuildName := fmt.Sprintf("Test Metrics Build %v", uuid.New())
 	createMetricsBuildRequest := api.CreateMetricsBuildInput{
 		Name:     metricsBuildName,
@@ -453,7 +456,7 @@ func (s *AgentTestSuite) createAndAwaitBatch(buildID uuid.UUID, experiences []uu
 			s.T().Logf("Batch completed, with status: %v", status)
 		}
 		return complete
-	}, 10*time.Minute, 10*time.Second)
+	}, 15*time.Minute, 10*time.Second)
 
 	// Validate that it has SUCCEEDED:
 	getBatchResponse, err := s.APIClient.GetBatchWithResponse(
