@@ -56,7 +56,6 @@ jobs:
         id: extract_pr
 
       - name: Build Go
-        if: steps.go-build-cache.outputs.cache-hit != 'true'
         run: go build -o ./agent-linux-amd64-${{ steps.extract_pr.outputs.VERSION }} -buildvcs=false ./cmd
         env:
           VERSION: ${{ steps.extract_pr.outputs.VERSION }}
@@ -68,7 +67,6 @@ jobs:
           aws-region: us-east-1
 
       - name: Upload binary to S3
-        if: steps.go-build-cache.outputs.cache-hit != 'true'
         run: aws s3 cp ./agent-* s3://resim-binaries/agent/
 
       - name: Test and Run coverage
