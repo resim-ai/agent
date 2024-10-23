@@ -1,9 +1,9 @@
 name: Release
 
-on: 
+on:
   push:
     tags:
-    - 'v*'
+    - v*
 
 jobs:
   build:
@@ -48,4 +48,4 @@ jobs:
 
     - uses: ncipollo/release-action@v1
       with:
-        artifacts: "agent-linux-amd64,agent-linux-arm64,agent-darwin-arm64"
+        artifacts: agent-linux-amd64,agent-linux-arm64,agent-darwin-arm64
