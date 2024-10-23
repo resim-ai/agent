@@ -45,3 +45,9 @@ Note that the `pool-labels` are an OR/ANY selection, that is, an agent running w
 ## CI
 
 `GO_VERSION` is set as global variable in the repository settings
+
+## Releases
+
+Binaries are built and uploaded to GitHub: https://github.com/resim-ai/agent/releases
+
+To perform a release, push the appropriate `v*` tag to `main`.
