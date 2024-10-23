@@ -23,7 +23,7 @@ write_files:
     owner: root:root
     permissions: '0644'
     content: ${cloudwatch_agent_config}
-  - path: /resim/config
+  - path: /resim/config.yaml
     owner: root:root
     permissions: '0644'
     content: |
@@ -34,7 +34,7 @@ write_files:
         - ${pool_labels}
       username: ${agent_username}
       password: ${agent_password}
-  - path: /resim/docker/config
+  - path: /resim/docker/config.yaml
     owner: root:root
     permissions: '0644'
     content: |
