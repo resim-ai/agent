@@ -35,8 +35,6 @@ func doUpdate(release *github.RepositoryRelease) error {
 	}
 	req.Header.Set("Accept", "application/octet-stream")
 
-	// REMOVE ONCE THE REPO IS PUBLIC
-	req.Header.Set("Authorization", "Bearer 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")
 	resp, err := client.Do(req)
 	if err != nil {
 		slog.Error("error requesting update", "err", err)
@@ -87,7 +85,8 @@ func doUpdate(release *github.RepositoryRelease) error {
 
 func (a *Agent) checkUpdate() error {
 	ctx := context.Background()
-	gh := github.NewClient(nil).WithAuthToken("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")
+
+	gh := github.NewClient(nil)
 
 	latestRelease, _, err := gh.Repositories.GetLatestRelease(ctx, "resim-ai", "agent")
 	if err != nil {
