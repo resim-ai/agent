@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags:
+    - v*.*.*
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ vars.GO_VERSION }}
+        cache: false
+
+    - name: Go Build Cache
+      id: go-build-cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-build-cache-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-build-cache-
+
+    - name: Install dependencies
+      run: go get .
+
+    - name: Build for linux-amd64
+      run: go build -o ./agent-linux-amd64 -buildvcs=false ./cmd
+
+    - name: Build for linux-arm64
+      run: go build -o ./agent-linux-arm64 -buildvcs=false ./cmd
+      env:
+        GOARCH: arm64
+
+    - name: Build for darwin-arm64
+      run: go build -o ./agent-darwin-arm64 -buildvcs=false ./cmd
+      env:
+        GOARCH: arm64
+        GOOS: darwin
+
+    - uses: ncipollo/release-action@v1
+      with:
+        artifacts: agent-linux-amd64,agent-linux-arm64,agent-darwin-arm64

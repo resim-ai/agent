@@ -10,7 +10,7 @@ See [the Agent page on our docs site](https://docs.resim.ai/guides/agent) for mo
 
 Install Docker (e.g. https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository)
 
-```
+```shell
 sudo chgrp docker /run/containerd/containerd.sock
 ```
 
@@ -45,3 +45,9 @@ Note that the `pool-labels` are an OR/ANY selection, that is, an agent running w
 ## CI
 
 `GO_VERSION` is set as global variable in the repository settings
+
+## Releases
+
+Binaries are built and uploaded to GitHub: https://github.com/resim-ai/agent/releases
+
+To perform a release, push the appropriate `v*` tag to `main`.
