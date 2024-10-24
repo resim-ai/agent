@@ -38,6 +38,8 @@ password:
 log-level: info
 # Size in MB of log file (default: 500), note that 3 compressed backups are kept
 log-max-filesize: 200
+# Auto update (default: true) - whether the agent will try to update itself when a new release is available
+auto-update: false
 ```
 
 Note that the `pool-labels` are an OR/ANY selection, that is, an agent running with the labels `big` and `small` will run jobs tagged with either of those labels.
