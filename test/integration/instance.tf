@@ -160,6 +160,7 @@ data "aws_iam_policy_document" "this" {
       "arn:aws:ecr:us-east-1:909785973729:repository/agent",
       "arn:aws:ecr:us-east-1:909785973729:repository/agent-test",
       "arn:aws:ecr:us-east-1:909785973729:repository/rerun-end-to-end-test-experience-build",
+      "arn:aws:ecr:us-east-1:909785973729:repository/rerun-end-to-end-test-metrics-build",
     ]
   }
 
