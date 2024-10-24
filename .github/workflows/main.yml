@@ -4,8 +4,6 @@ on:  #trunk-ignore(yamllint/truthy)
   push:
     branches:
       - main
-    tags:
-      - v*.*.*
   pull_request:  # trunk-ignore(yamllint/empty-values)
 
 concurrency:
