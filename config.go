@@ -23,7 +23,7 @@ const (
 	UsernameKey             = "username"
 	PasswordKey             = "password"
 	AgentNameKey            = "name"
-	EnvPrefix               = "RERUN_AGENT"
+	EnvPrefix               = "RESIM_AGENT"
 	LogLevelKey             = "log-level"
 	LogFilesizeKey          = "log-max-filesize"
 	LogFilesizeDefault      = 500
