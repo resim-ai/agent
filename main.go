@@ -1,4 +1,4 @@
-package agent
+package main
 
 import (
 	"bytes"
@@ -55,6 +55,25 @@ type Agent struct {
 }
 
 type Task api.TaskPollOutput
+
+func main() {
+	a := Agent{}
+
+	ConfigDir := os.Getenv("RESIM_AGENT_CONFIG_DIR")
+	if ConfigDir != "" {
+		a.ConfigDirOverride = ConfigDir
+	}
+
+	LogDir := os.Getenv("RESIM_AGENT_LOG_DIR")
+	if LogDir != "" {
+		a.LogDirOverride = LogDir
+	}
+
+	err := a.Start()
+	if err != nil {
+		os.Exit(1)
+	}
+}
 
 func (a *Agent) Start() error {
 	err := a.LoadConfig()
