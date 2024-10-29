@@ -1,4 +1,4 @@
-package agent_test
+package main
 
 import (
 	"log"
@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/resim-ai/agent"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -44,7 +43,7 @@ func (s *AgentTestSuite) TestStringifyEnvironmentVariables() {
 		{"RERUN_WORKER_BAR", "foo"},
 	}
 
-	outputVars := agent.StringifyEnvironmentVariables(inputVars)
+	outputVars := StringifyEnvironmentVariables(inputVars)
 
 	s.ElementsMatch([]string{
 		"RERUN_WORKER_FOO=bar",
@@ -56,7 +55,7 @@ func (s *AgentTestSuite) TestLoadConfigFile() {
 	configFile := createConfigFile()
 	defer os.Remove(configFile)
 
-	a := agent.Agent{
+	a := Agent{
 		ConfigDirOverride: filepath.Dir(configFile),
 	}
 
@@ -68,7 +67,7 @@ func (s *AgentTestSuite) TestLoadConfigFile() {
 }
 
 func (s *AgentTestSuite) TestInvalidConfig() {
-	a := agent.Agent{
+	a := Agent{
 		ConfigDirOverride: "/not/real/path/",
 	}
 
@@ -80,7 +79,7 @@ func (s *AgentTestSuite) TestInvalidConfig() {
 func (s *AgentTestSuite) TestInvalidDockerClient() {
 	os.Setenv("DOCKER_HOST", "1.2.3.4:1234")
 
-	a := agent.Agent{}
+	a := Agent{}
 
 	err := a.Start()
 	s.Error(err)

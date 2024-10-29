@@ -54,7 +54,7 @@ RUN \
   go env -w CGO_ENABLED=${CGO_ENABLED}  &&\
   go env -w GOOS=${TARGET_PLATFORM} && \
   go env -w GOARCH=${TARGET_ARCH} && \
-  go build -trimpath -o /dist/agent ./cmd &&\
+  go build -trimpath -o /dist/agent . &&\
   ldd /dist/agent | tr -s '[:blank:]' '\n' | grep ^/ | xargs -I % install -D % /dist/%
 
 FROM scratch AS agent
