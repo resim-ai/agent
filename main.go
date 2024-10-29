@@ -8,6 +8,7 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -242,6 +243,8 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 	extraEnvVars := []string{
 		"RERUN_WORKER_ENVIRONMENT=dev",
 	}
+	homeDir, _ := os.UserHomeDir()
+	hostDockerConfigDir := filepath.Join(homeDir, ".docker")
 
 	config := &container.Config{
 		Image: *task.WorkerImageURI,
@@ -264,7 +267,7 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 				},
 				{
 					Type:   mount.TypeBind,
-					Source: "/root/.docker",
+					Source: hostDockerConfigDir,
 					Target: "/root/.docker",
 				},
 			},
