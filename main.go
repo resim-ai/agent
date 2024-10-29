@@ -244,7 +244,7 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 		"RERUN_WORKER_ENVIRONMENT=dev",
 	}
 	homeDir, _ := os.UserHomeDir()
-	hostDockerConfigDir := filepath.Join(homeDir, ".docker")
+	hostDockerConfigDir, _ := filepath.Abs(filepath.Join(homeDir, ".docker"))
 
 	config := &container.Config{
 		Image: *task.WorkerImageURI,
