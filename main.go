@@ -8,6 +8,8 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"os/user"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -242,6 +244,15 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 	extraEnvVars := []string{
 		"RERUN_WORKER_ENVIRONMENT=dev",
 	}
+	var homeDir string
+	user, err := user.Current()
+	if err != nil {
+		slog.Warn("Couldn't lookup user; assuming root", "error", err)
+		homeDir = "/root"
+	} else {
+		homeDir = user.HomeDir
+	}
+	hostDockerConfigDir, _ := filepath.Abs(filepath.Join(homeDir, ".docker"))
 
 	config := &container.Config{
 		Image: *task.WorkerImageURI,
@@ -261,6 +272,11 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 					Type:   mount.TypeBind,
 					Source: "/tmp/resim",
 					Target: "/tmp/resim",
+				},
+				{
+					Type:   mount.TypeBind,
+					Source: hostDockerConfigDir,
+					Target: "/root/.docker",
 				},
 			},
 		},
