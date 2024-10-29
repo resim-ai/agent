@@ -262,6 +262,11 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 					Source: "/tmp/resim",
 					Target: "/tmp/resim",
 				},
+				{
+					Type:   mount.TypeBind,
+					Source: "/root/.docker",
+					Target: "/root/.docker",
+				},
 			},
 		},
 		&network.NetworkingConfig{},
