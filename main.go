@@ -8,6 +8,7 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"os/user"
 	"path/filepath"
 	"sync"
 	"time"
@@ -243,7 +244,8 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 	extraEnvVars := []string{
 		"RERUN_WORKER_ENVIRONMENT=dev",
 	}
-	homeDir, _ := os.UserHomeDir()
+	user, _ := user.Current()
+	homeDir := user.HomeDir
 	hostDockerConfigDir, _ := filepath.Abs(filepath.Join(homeDir, ".docker"))
 
 	config := &container.Config{
