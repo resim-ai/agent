@@ -244,8 +244,14 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 	extraEnvVars := []string{
 		"RERUN_WORKER_ENVIRONMENT=dev",
 	}
-	user, _ := user.Current()
-	homeDir := user.HomeDir
+	var homeDir string
+	user, err := user.Current()
+	if err != nil {
+		slog.Warn("Couldn't lookup user; assuming root", "error", err)
+		homeDir = "/root"
+	} else {
+		homeDir = user.HomeDir
+	}
 	hostDockerConfigDir, _ := filepath.Abs(filepath.Join(homeDir, ".docker"))
 
 	config := &container.Config{
