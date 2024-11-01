@@ -1,4 +1,4 @@
-# CHANGELOG
+# ReSim Agent Changelog
 
 Changes and release notes for the ReSim agent
 
