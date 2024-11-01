@@ -1,4 +1,4 @@
-package agent
+package main
 
 import (
 	"context"
@@ -104,6 +104,10 @@ func (a *Agent) checkUpdate() error {
 				slog.Error("error in automatic update", "err", err)
 				return err
 			}
+				} else {
+			releaseURL := latestRelease.GetHTMLURL()
+			slog.Info(fmt.Sprintf("download the new version from %v", releaseURL))
+			slog.Info("or run go install github.com/resim-ai/agent@latest")
 		}
 	case 0:
 		slog.Debug("running the latest release", "version", agentVersion)

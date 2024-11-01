@@ -52,7 +52,7 @@ func (a *Agent) LoadConfig() error {
 	viper.SetDefault(LogLevelKey, "info")
 	a.LogLevel = viper.GetString(LogLevelKey)
 
-	viper.SetDefault(AutoUpdateKey, true)
+	viper.SetDefault(AutoUpdateKey, false)
 	a.AutoUpdate = viper.GetBool(AutoUpdateKey)
 
 	viper.SetDefault(LogFilesizeKey, LogFilesizeDefault)
