@@ -27,6 +27,7 @@ const (
 	LogLevelKey             = "log-level"
 	LogFilesizeKey          = "log-max-filesize"
 	LogFilesizeDefault      = 500
+	AutoUpdateKey           = "auto-update"
 	ConfigPath              = "$HOME/resim"
 	CredentialCacheFilename = "cache.json"
 )
@@ -50,6 +51,9 @@ func (a *Agent) LoadConfig() error {
 
 	viper.SetDefault(LogLevelKey, "info")
 	a.LogLevel = viper.GetString(LogLevelKey)
+
+	viper.SetDefault(AutoUpdateKey, false)
+	a.AutoUpdate = viper.GetBool(AutoUpdateKey)
 
 	viper.SetDefault(LogFilesizeKey, LogFilesizeDefault)
 
@@ -101,7 +105,7 @@ func (a *Agent) InitializeLogging() error {
 	}
 
 	// test write to check permissions on the file
-	_, err := logFileWriter.Write([]byte("ReSim Agent Log\n"))
+	_, err := logFileWriter.Write([]byte(fmt.Sprintf("ReSim Agent %v", agentVersion)))
 	if err != nil {
 		return err
 	}

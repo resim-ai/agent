@@ -24,6 +24,8 @@ import (
 	"golang.org/x/oauth2"
 )
 
+const agentVersion = "v0.2.2"
+
 type agentStatus string
 
 const (
@@ -54,6 +56,7 @@ type Agent struct {
 	Status            agentStatus
 	CurrentTaskName   string
 	CurrentTaskStatus api.TaskStatus
+	AutoUpdate        bool
 }
 
 type Task api.TaskPollOutput
@@ -90,6 +93,12 @@ func (a *Agent) Start() error {
 		return err
 	}
 
+	err = a.checkUpdate()
+	if err != nil {
+		slog.Error("error checking for update", "err", err)
+		return err
+	}
+
 	err = a.initializeDockerClient()
 	if err != nil {
 		slog.Error("error initializing Docker client", "err", err)
@@ -104,6 +113,8 @@ func (a *Agent) Start() error {
 	}
 	a.APIClient = apiClient
 	defer a.saveCredentialCache()
+
+	slog.Info("agent initialised", "version", agentVersion, "log_level", a.LogLevel)
 
 	agentStateChan := make(chan agentStatus)
 	taskStateChan := make(chan taskStatusMessage)
