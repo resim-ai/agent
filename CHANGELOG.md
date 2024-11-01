@@ -1,5 +1,7 @@
 # CHANGELOG
 
+Changes and release notes for the ReSim agent
+
 ## v0.2.2 - 2024-11-1
 
 - The agent now checks for updates and logs if a new version is available
