@@ -38,7 +38,7 @@ password:
 log-level: info
 # Size in MB of log file (default: 500), note that 3 compressed backups are kept
 log-max-filesize: 200
-# Auto update (default: true) - whether the agent will try to update itself when a new release is available
+# Auto update (default: false) - whether the agent will try to update itself when a new release is available
 auto-update: false
 ```
 
