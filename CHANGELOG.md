@@ -1,4 +1,5 @@
-# ReSim Agent Changelog
+<!-- markdownlint-disable MD041 -->
+# Changelog
 
 Changes and release notes for the ReSim agent
 
