@@ -1,4 +1,4 @@
-package agent
+package main
 
 import (
 	"bytes"
@@ -8,6 +8,8 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"os/user"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -58,6 +60,25 @@ type Agent struct {
 }
 
 type Task api.TaskPollOutput
+
+func main() {
+	a := Agent{}
+
+	ConfigDir := os.Getenv("RESIM_AGENT_CONFIG_DIR")
+	if ConfigDir != "" {
+		a.ConfigDirOverride = ConfigDir
+	}
+
+	LogDir := os.Getenv("RESIM_AGENT_LOG_DIR")
+	if LogDir != "" {
+		a.LogDirOverride = LogDir
+	}
+
+	err := a.Start()
+	if err != nil {
+		os.Exit(1)
+	}
+}
 
 func (a *Agent) Start() error {
 	err := a.LoadConfig()
@@ -234,6 +255,15 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 	extraEnvVars := []string{
 		"RERUN_WORKER_ENVIRONMENT=dev",
 	}
+	var homeDir string
+	user, err := user.Current()
+	if err != nil {
+		slog.Warn("Couldn't lookup user; assuming root", "error", err)
+		homeDir = "/root"
+	} else {
+		homeDir = user.HomeDir
+	}
+	hostDockerConfigDir, _ := filepath.Abs(filepath.Join(homeDir, ".docker"))
 
 	config := &container.Config{
 		Image: *task.WorkerImageURI,
@@ -253,6 +283,11 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 					Type:   mount.TypeBind,
 					Source: "/tmp/resim",
 					Target: "/tmp/resim",
+				},
+				{
+					Type:   mount.TypeBind,
+					Source: hostDockerConfigDir,
+					Target: "/root/.docker",
 				},
 			},
 		},

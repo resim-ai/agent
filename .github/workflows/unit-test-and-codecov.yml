@@ -56,7 +56,7 @@ jobs:
         id: extract_pr
 
       - name: Build Go
-        run: go build -o ./agent-linux-amd64-${{ steps.extract_pr.outputs.VERSION }} -buildvcs=false ./cmd
+        run: go build -o ./agent-linux-amd64-${{ steps.extract_pr.outputs.VERSION }} -buildvcs=false .
         env:
           VERSION: ${{ steps.extract_pr.outputs.VERSION }}
 

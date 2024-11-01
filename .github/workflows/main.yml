@@ -33,7 +33,7 @@ jobs:
 
   sbom:
     name: Security Scan and SBOM Generation
-    uses: resim-ai/workflows/.github/workflows/security-and-sbom.yml@v3
+    uses: ./.github/workflows/security-and-sbom.yml
     with:
       severity: MEDIUM,HIGH,CRITICAL
       repository: agent
