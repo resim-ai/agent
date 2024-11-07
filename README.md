@@ -40,6 +40,8 @@ log-level: info
 log-max-filesize: 200
 # Auto update (default: false) - whether the agent will try to update itself when a new release is available
 auto-update: false
+# Privileged mode (default: false) - if true, your jobs will be run with elevated privileges (equivalent to docker --privileged)
+privileged: false
 ```
 
 Note that the `pool-labels` are an OR/ANY selection, that is, an agent running with the labels `big` and `small` will run jobs tagged with either of those labels.

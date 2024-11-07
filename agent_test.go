@@ -86,3 +86,19 @@ func (s *AgentTestSuite) TestInvalidDockerClient() {
 
 	os.Unsetenv("DOCKER_HOST")
 }
+
+func (s *AgentTestSuite) TestPrivilegedMode() {
+	configFile := createConfigFile()
+	defer os.Remove(configFile)
+
+	a := Agent{
+		ConfigDirOverride: filepath.Dir(configFile),
+	}
+
+	os.Setenv("RESIM_AGENT_PRIVILEGED", "true")
+
+	err := a.LoadConfig()
+	s.NoError(err)
+
+	s.Equal(a.Privileged, true)
+}

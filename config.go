@@ -28,6 +28,8 @@ const (
 	LogFilesizeKey          = "log-max-filesize"
 	LogFilesizeDefault      = 500
 	AutoUpdateKey           = "auto-update"
+	PrivilegedKey           = "privileged"
+	PrivilegedDefault       = false
 	ConfigPath              = "$HOME/resim"
 	CredentialCacheFilename = "cache.json"
 )
@@ -57,6 +59,9 @@ func (a *Agent) LoadConfig() error {
 
 	viper.SetDefault(LogFilesizeKey, LogFilesizeDefault)
 
+	viper.SetDefault(PrivilegedKey, PrivilegedDefault)
+	a.Privileged = viper.GetBool(PrivilegedKey)
+
 	viper.SetDefault(APIHostKey, APIHostDefault)
 	viper.SetDefault(AuthHostKey, AuthHostDefault)
 
@@ -83,6 +88,7 @@ func (a *Agent) LoadConfig() error {
 		"authHost", a.AuthHost,
 		"name", a.Name,
 		"poolLabels", a.PoolLabels,
+		"privileged", a.Privileged,
 	)
 
 	return nil

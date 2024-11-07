@@ -57,6 +57,7 @@ type Agent struct {
 	CurrentTaskName   string
 	CurrentTaskStatus api.TaskStatus
 	AutoUpdate        bool
+	Privileged        bool
 }
 
 type Task api.TaskPollOutput
@@ -255,6 +256,10 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 	extraEnvVars := []string{
 		"RERUN_WORKER_ENVIRONMENT=dev",
 	}
+	if a.Privileged {
+		extraEnvVars = append(extraEnvVars, "RERUN_WORKER_PRIVILEGED=true")
+	}
+
 	var homeDir string
 	user, err := user.Current()
 	if err != nil {
