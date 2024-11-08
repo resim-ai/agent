@@ -67,6 +67,9 @@ func (a *Agent) LoadConfig() error {
 
 	a.APIHost = viper.GetString(APIHostKey)
 	a.AuthHost = viper.GetString(AuthHostKey)
+	if strings.HasSuffix(a.AuthHost, "/") {
+		a.AuthHost = strings.TrimRight(a.AuthHost, "/")
+	}
 	if a.AuthHost != AuthHostDefault {
 		a.ClientID = devClientID
 	} else {
@@ -89,6 +92,7 @@ func (a *Agent) LoadConfig() error {
 		"name", a.Name,
 		"poolLabels", a.PoolLabels,
 		"privileged", a.Privileged,
+		"one_task", viper.GetBool(OneTaskKey),
 	)
 
 	return nil
