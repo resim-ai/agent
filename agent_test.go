@@ -174,29 +174,11 @@ func (s *AgentTestSuite) TestPrivilegedMode() {
 		container.StartOptions{},
 	).Return(nil).Once()
 
-	inspectionResult1 := new(types.ContainerJSON)
-	inspectionResult1.ContainerJSONBase = new(types.ContainerJSONBase)
-	inspectionResult1.State = new(types.ContainerState)
-	inspectionResult1.State.Status = "running"
-	inspectionResult1.State.Running = true
+	runningContainer := createTestContainer("running", true)
+	s.mockDocker.On("ContainerInspect", mock.Anything, containerID).Return(runningContainer, nil).Once()
 
-	s.mockDocker.On(
-		"ContainerInspect",
-		mock.Anything,
-		containerID,
-	).Return(*inspectionResult1, nil).Once()
-
-	inspectionResult2 := new(types.ContainerJSON)
-	inspectionResult2.ContainerJSONBase = new(types.ContainerJSONBase)
-	inspectionResult2.State = new(types.ContainerState)
-	inspectionResult2.State.Status = "succeeded"
-	inspectionResult2.State.Running = false
-
-	s.mockDocker.On(
-		"ContainerInspect",
-		mock.Anything,
-		containerID,
-	).Return(*inspectionResult2, nil).Once()
+	succeededContainer := createTestContainer("succeeded", false)
+	s.mockDocker.On("ContainerInspect", mock.Anything, containerID).Return(succeededContainer, nil).Once()
 
 	err := s.agent.Start()
 	s.NoError(err)
@@ -221,4 +203,15 @@ func (s *AgentTestSuite) mockAuthServer() *httptest.Server {
 		}
 
 	}))
+}
+
+func createTestContainer(status string, running bool) types.ContainerJSON {
+	return types.ContainerJSON{
+		ContainerJSONBase: &types.ContainerJSONBase{
+			State: &types.ContainerState{
+				Status:  status,
+				Running: running,
+			},
+		},
+	}
 }
