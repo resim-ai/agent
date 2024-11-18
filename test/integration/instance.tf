@@ -88,7 +88,7 @@ data "cloudinit_config" "config" {
 
 resource "aws_instance" "test_agent" {
   ami             = data.aws_ami.this.id
-  instance_type   = "t2.micro"
+  instance_type   = "t3a.micro"
   subnet_id       = "subnet-068480ff23a430b87"
   security_groups = ["sg-02994ab0d8a58f1dc"]
 

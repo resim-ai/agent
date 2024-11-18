@@ -24,7 +24,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const agentVersion = "v0.2.2"
+const agentVersion = "v0.2.3"
 
 type agentStatus string
 
@@ -42,7 +42,7 @@ type taskStatusMessage struct {
 
 type Agent struct {
 	APIClient         *api.ClientWithResponses
-	DockerClient      *client.Client
+	Docker            DockerClient
 	CurrentToken      *oauth2.Token
 	TokenMutex        sync.Mutex
 	ClientID          string
@@ -57,12 +57,20 @@ type Agent struct {
 	CurrentTaskName   string
 	CurrentTaskStatus api.TaskStatus
 	AutoUpdate        bool
+	Privileged        bool
 }
 
 type Task api.TaskPollOutput
 
 func main() {
-	a := Agent{}
+	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		slog.Error("error initializing Docker client", "err", err)
+		os.Exit(1)
+	}
+	defer dockerClient.Close()
+
+	a := New(dockerClient)
 
 	ConfigDir := os.Getenv("RESIM_AGENT_CONFIG_DIR")
 	if ConfigDir != "" {
@@ -74,9 +82,17 @@ func main() {
 		a.LogDirOverride = LogDir
 	}
 
-	err := a.Start()
+	err = a.Start()
 	if err != nil {
 		os.Exit(1)
+	} else {
+		os.Exit(0)
+	}
+}
+
+func New(dockerClient DockerClient) *Agent {
+	return &Agent{
+		Docker: dockerClient,
 	}
 }
 
@@ -98,13 +114,6 @@ func (a *Agent) Start() error {
 		slog.Error("error checking for update", "err", err)
 		return err
 	}
-
-	err = a.initializeDockerClient()
-	if err != nil {
-		slog.Error("error initializing Docker client", "err", err)
-		return err
-	}
-	defer a.DockerClient.Close()
 
 	ctx := context.Background()
 	apiClient, err := a.getAPIClient(ctx)
@@ -166,24 +175,14 @@ func (a *Agent) Start() error {
 
 		if viper.GetBool(OneTaskKey) {
 			slog.Info("Agent launched in one-task mode, exiting")
-			os.Exit(0)
+			return nil
 		}
 	}
 }
 
-func (a *Agent) initializeDockerClient() error {
-	var err error
-	a.DockerClient, err = client.NewClientWithOpts(client.FromEnv)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (a *Agent) pullImage(ctx context.Context, targetImage string) error {
 	slog.Info("Pulling image", "image", targetImage)
-	r, err := a.DockerClient.ImagePull(ctx, targetImage, image.PullOptions{
+	r, err := a.Docker.ImagePull(ctx, targetImage, image.PullOptions{
 		Platform: "linux/amd64",
 	})
 	if err != nil {
@@ -255,6 +254,10 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 	extraEnvVars := []string{
 		"RERUN_WORKER_ENVIRONMENT=dev",
 	}
+	if a.Privileged {
+		extraEnvVars = append(extraEnvVars, "RERUN_WORKER_PRIVILEGED=true")
+	}
+
 	var homeDir string
 	user, err := user.Current()
 	if err != nil {
@@ -269,7 +272,7 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 		Image: *task.WorkerImageURI,
 		Env:   append(providedEnvVars, extraEnvVars...),
 	}
-	res, err := a.DockerClient.ContainerCreate(
+	res, err := a.Docker.ContainerCreate(
 		context.TODO(),
 		config,
 		&container.HostConfig{
@@ -299,7 +302,7 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 		fmt.Println(err)
 	}
 
-	err = a.DockerClient.ContainerStart(ctx, res.ID, container.StartOptions{})
+	err = a.Docker.ContainerStart(ctx, res.ID, container.StartOptions{})
 	if err != nil {
 		return err
 	}
@@ -310,7 +313,7 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 	}
 	a.setCurrentTask(*task.TaskName, api.RUNNING)
 	for {
-		status, err := a.DockerClient.ContainerInspect(ctx, res.ID)
+		status, err := a.Docker.ContainerInspect(ctx, res.ID)
 		if err != nil {
 			return err
 		}

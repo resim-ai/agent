@@ -3,7 +3,11 @@
 
 Changes and release notes for the ReSim agent
 
-## v0.2.2 - 2024-11-1
+## v0.2.3 - 2024-11-18
+
+- Added privileged mode to enable running test workloads with elevated privileges
+
+## v0.2.2 - 2024-11-01
 
 - The agent now checks for updates and logs if a new version is available
 

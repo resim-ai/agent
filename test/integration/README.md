@@ -4,7 +4,7 @@ This directory has basic integration tests for the agent that will run on merge 
 
 1. Build the agent binary and push to a private S3 bucket
 2. Build a test build image with Hello World and some experiences baked in for the actual test
-3. Bring up a test environment - deploy an Umbongo machine in the default VPC
+3. Bring up a test environment - deploy an Ubuntu machine in the default VPC
 4. Download the agent binary associated with the PR
 5. Run an abridged version of the 'Worker' test from the E2E test suite as follows:
    a. Create a `project`, `system`, `branch` and two `build`s, one with Hello World, and one with the test image from (2.) in the supplied ReRun environment
@@ -40,10 +40,10 @@ AWS_PROFILE=rerun_dev
 AWS_REGION=us-east-1
 AGENT_TEST_NAME=<any_arbitrary_name>
 AGENT_TEST_POOL_LABELS=<your_unique_pool_label>
-AGENT_TEST_API_HOST=https://dev-env-pr-1269.api.dev.resim.io/v1/
+AGENT_TEST_API_HOST=https://dev-env-pr-<your rerun PR>.api.dev.resim.io/v1/
 AGENT_TEST_USERNAME=cli+e2e.resim.ai@resim.ai
 AGENT_TEST_AUTH_HOST=https://resim-dev.us.auth0.com
-AGENT_TEST_EXPERIENCE_BUCKET=dev-dev-env-pr-1269-experiences
+AGENT_TEST_EXPERIENCE_BUCKET=dev-dev-env-pr-<your rerun PR>-experiences
 AGENT_TEST_PASSWORD=<the_password_you_obtained>
 AGENT_TEST_LOCAL_IMAGE=<your_test_build_image>
 ```
