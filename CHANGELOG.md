@@ -3,6 +3,10 @@
 
 Changes and release notes for the ReSim agent
 
+## v0.2.4 - 2024-11-18
+
+- Added host-networking mode to enable running test workloads without network isolation
+
 ## v0.2.3 - 2024-11-18
 
 - Added privileged mode to enable running test workloads with elevated privileges

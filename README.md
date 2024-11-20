@@ -42,6 +42,8 @@ log-max-filesize: 200
 auto-update: false
 # Privileged mode (default: false) - if true, your jobs will be run with elevated privileges (equivalent to docker --privileged)
 privileged: false
+# Privileged mode (default: false) - if true, your jobs will be run without network isolation (equivalent to docker run --net=host)
+network-host: false
 ```
 
 Note that the `pool-labels` are an OR/ANY selection, that is, an agent running with the labels `big` and `small` will run jobs tagged with either of those labels.

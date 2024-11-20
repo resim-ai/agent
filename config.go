@@ -30,6 +30,8 @@ const (
 	AutoUpdateKey           = "auto-update"
 	PrivilegedKey           = "privileged"
 	PrivilegedDefault       = false
+	NetworkHost             = "network-host"
+	NetworkHostDefault      = false
 	ConfigPath              = "$HOME/resim"
 	CredentialCacheFilename = "cache.json"
 )
@@ -62,6 +64,9 @@ func (a *Agent) LoadConfig() error {
 	viper.SetDefault(PrivilegedKey, PrivilegedDefault)
 	a.Privileged = viper.GetBool(PrivilegedKey)
 
+	viper.SetDefault(NetworkHost, NetworkHostDefault)
+	a.NetworkHost = viper.GetBool(NetworkHost)
+
 	viper.SetDefault(APIHostKey, APIHostDefault)
 	viper.SetDefault(AuthHostKey, AuthHostDefault)
 
@@ -92,6 +97,7 @@ func (a *Agent) LoadConfig() error {
 		"name", a.Name,
 		"poolLabels", a.PoolLabels,
 		"privileged", a.Privileged,
+		"networkHost", a.NetworkHost,
 		"one_task", viper.GetBool(OneTaskKey),
 	)
 

@@ -24,7 +24,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const agentVersion = "v0.2.3"
+const agentVersion = "v0.2.4-dev"
 
 type agentStatus string
 
@@ -58,6 +58,7 @@ type Agent struct {
 	CurrentTaskStatus api.TaskStatus
 	AutoUpdate        bool
 	Privileged        bool
+	NetworkHost       bool
 }
 
 type Task api.TaskPollOutput
@@ -272,6 +273,13 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 		Image: *task.WorkerImageURI,
 		Env:   append(providedEnvVars, extraEnvVars...),
 	}
+
+	var networkMode container.NetworkMode
+	networkMode = network.NetworkDefault
+	if a.NetworkHost {
+		networkMode = network.NetworkHost
+	}
+
 	res, err := a.Docker.ContainerCreate(
 		context.TODO(),
 		config,
@@ -293,6 +301,7 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 					Target: "/root/.docker",
 				},
 			},
+			NetworkMode: networkMode,
 		},
 		&network.NetworkingConfig{},
 		&v1.Platform{},

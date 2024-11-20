@@ -14,6 +14,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/network"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -126,6 +127,9 @@ func (s *AgentTestSuite) TestPrivilegedMode() {
 	os.Setenv("RESIM_AGENT_PRIVILEGED", "true")
 	defer os.Unsetenv("RESIM_AGENT_PRIVILEGED")
 
+	os.Setenv("RESIM_AGENT_NETWORK_HOST", "true")
+	defer os.Unsetenv("RESIM_AGENT_NETWORK_HOST")
+
 	os.Setenv("RESIM_AGENT_ONE_TASK", "true")
 	defer os.Unsetenv("RESIM_AGENT_ONE_TASK")
 
@@ -149,6 +153,7 @@ func (s *AgentTestSuite) TestPrivilegedMode() {
 	containerID := uuid.UUID.String(uuid.New())
 
 	var workerPrivilegedEnvVar string
+	var containerNetworkMode container.NetworkMode
 	s.mockDocker.On(
 		"ContainerCreate",
 		mock.Anything,
@@ -163,6 +168,8 @@ func (s *AgentTestSuite) TestPrivilegedMode() {
 				workerPrivilegedEnvVar = envVar
 			}
 		}
+		hostConfig := args.Get(2).(*container.HostConfig)
+		containerNetworkMode = hostConfig.NetworkMode
 	}).Return(container.CreateResponse{
 		ID: containerID,
 	}, nil).Once()
@@ -185,8 +192,10 @@ func (s *AgentTestSuite) TestPrivilegedMode() {
 
 	// check the agent is running in privileged mode
 	s.Equal(s.agent.Privileged, true)
+	s.Equal(s.agent.NetworkHost, true)
 	// check privileged mode is being passed through to the worker
 	s.Equal(workerPrivilegedEnvVar, "RERUN_WORKER_PRIVILEGED=true")
+	s.Equal(containerNetworkMode, container.NetworkMode(network.NetworkHost))
 }
 
 func (s *AgentTestSuite) mockAuthServer() *httptest.Server {
