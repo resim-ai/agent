@@ -24,7 +24,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const agentVersion = "v0.2.4-dev"
+const agentVersion = "v0.2.4"
 
 type agentStatus string
 
