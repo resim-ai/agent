@@ -24,7 +24,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const agentVersion = "v0.2.4"
+const agentVersion = "v0.2.5"
 
 type agentStatus string
 
@@ -268,35 +268,59 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 	} else {
 		homeDir = user.HomeDir
 	}
+
 	hostDockerConfigDir, _ := filepath.Abs(filepath.Join(homeDir, ".docker"))
+	_, err = os.Stat(hostDockerConfigDir)
+	if err != nil {
+		slog.Info("Docker config directory does not exist")
+	}
+
+	hostAWSConfigDir, _ := filepath.Abs(filepath.Join(homeDir, ".aws"))
+	// check that this exists:
+	mountAWSConfigDir := true
+	_, err = os.Stat(hostAWSConfigDir)
+	if err != nil {
+		slog.Info("AWS config directory does not exist")
+		mountAWSConfigDir = false
+	}
 
 	config := &container.Config{
 		Image: *task.WorkerImageURI,
 		Env:   append(providedEnvVars, extraEnvVars...),
 	}
 
+	hostConfig := &container.HostConfig{
+		Mounts: []mount.Mount{
+			{
+				Type:   mount.TypeBind,
+				Source: "/var/run/docker.sock",
+				Target: "/var/run/docker.sock",
+			},
+			{
+				Type:   mount.TypeBind,
+				Source: "/tmp/resim",
+				Target: "/tmp/resim",
+			},
+			{
+				Type:   mount.TypeBind,
+				Source: hostDockerConfigDir,
+				Target: "/root/.docker",
+			},
+		},
+	}
+
+	if mountAWSConfigDir {
+		hostConfig.Mounts = append(hostConfig.Mounts, mount.Mount{
+			Type:   mount.TypeBind,
+			Source: hostAWSConfigDir,
+			Target: "/root/.aws",
+		})
+	}
+
 	res, err := a.Docker.ContainerCreate(
 		context.TODO(),
 		config,
-		&container.HostConfig{
-			Mounts: []mount.Mount{
-				{
-					Type:   mount.TypeBind,
-					Source: "/var/run/docker.sock",
-					Target: "/var/run/docker.sock",
-				},
-				{
-					Type:   mount.TypeBind,
-					Source: "/tmp/resim",
-					Target: "/tmp/resim",
-				},
-				{
-					Type:   mount.TypeBind,
-					Source: hostDockerConfigDir,
-					Target: "/root/.docker",
-				},
-			},
-		},
+		hostConfig,
 		&network.NetworkingConfig{},
 		&v1.Platform{},
 		*task.TaskName,
