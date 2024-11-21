@@ -200,6 +200,7 @@ func (s *AgentTestSuite) TestPrivilegedModeHostMode() {
 	s.Equal("RERUN_WORKER_DOCKER_NETWORK_MODE=host", workerDockerNetworkModeEnvVar)
 }
 
+// TODO(iain): DRY this out once we have more optionality
 func (s *AgentTestSuite) TestDefaultAgentDockeModes() {
 	configDir := createConfigFile()
 	defer os.Remove(configDir)
