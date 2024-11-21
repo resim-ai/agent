@@ -272,7 +272,7 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 	hostDockerConfigDir, _ := filepath.Abs(filepath.Join(homeDir, ".docker"))
 	_, err = os.Stat(hostDockerConfigDir)
 	if err != nil {
-		log.Fatal("Docker config directory does not exist")
+		slog.Info("Docker config directory does not exist")
 	}
 
 	hostAWSConfigDir, _ := filepath.Abs(filepath.Join(homeDir, ".aws"))
