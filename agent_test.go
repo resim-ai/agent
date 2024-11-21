@@ -14,7 +14,6 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/network"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -99,7 +98,7 @@ func (s *AgentTestSuite) TestInvalidConfig() {
 	s.Error(err)
 }
 
-func (s *AgentTestSuite) TestPrivilegedMode() {
+func (s *AgentTestSuite) TestPrivilegedModeHostMode() {
 	configDir := createConfigFile()
 	defer os.Remove(configDir)
 
@@ -127,8 +126,8 @@ func (s *AgentTestSuite) TestPrivilegedMode() {
 	os.Setenv("RESIM_AGENT_PRIVILEGED", "true")
 	defer os.Unsetenv("RESIM_AGENT_PRIVILEGED")
 
-	os.Setenv("RESIM_AGENT_NETWORK_HOST", "true")
-	defer os.Unsetenv("RESIM_AGENT_NETWORK_HOST")
+	os.Setenv("RESIM_AGENT_DOCKER_NETWORK_MODE", "host")
+	defer os.Unsetenv("RESIM_AGENT_DOCKER_NETWORK_MODE")
 
 	os.Setenv("RESIM_AGENT_ONE_TASK", "true")
 	defer os.Unsetenv("RESIM_AGENT_ONE_TASK")
@@ -153,7 +152,7 @@ func (s *AgentTestSuite) TestPrivilegedMode() {
 	containerID := uuid.UUID.String(uuid.New())
 
 	var workerPrivilegedEnvVar string
-	var containerNetworkMode container.NetworkMode
+	var workerDockerNetworkModeEnvVar string
 	s.mockDocker.On(
 		"ContainerCreate",
 		mock.Anything,
@@ -167,9 +166,10 @@ func (s *AgentTestSuite) TestPrivilegedMode() {
 			if strings.HasPrefix(envVar, "RERUN_WORKER_PRIVILEGED") {
 				workerPrivilegedEnvVar = envVar
 			}
+			if strings.HasPrefix(envVar, "RERUN_WORKER_DOCKER_NETWORK_MODE") {
+				workerDockerNetworkModeEnvVar = envVar
+			}
 		}
-		hostConfig := args.Get(2).(*container.HostConfig)
-		containerNetworkMode = hostConfig.NetworkMode
 	}).Return(container.CreateResponse{
 		ID: containerID,
 	}, nil).Once()
@@ -191,11 +191,109 @@ func (s *AgentTestSuite) TestPrivilegedMode() {
 	s.NoError(err)
 
 	// check the agent is running in privileged mode
-	s.Equal(s.agent.Privileged, true)
-	s.Equal(s.agent.NetworkHost, true)
+	s.Equal(true, s.agent.Privileged)
+	// check the agent uses the default bridge network mode
+	s.Equal(DockerNetworkModeHost, s.agent.NetworkMode)
 	// check privileged mode is being passed through to the worker
-	s.Equal(workerPrivilegedEnvVar, "RERUN_WORKER_PRIVILEGED=true")
-	s.Equal(containerNetworkMode, container.NetworkMode(network.NetworkHost))
+	s.Equal("RERUN_WORKER_PRIVILEGED=true", workerPrivilegedEnvVar)
+	// check docker network mode is being passed through to the worker
+	s.Equal("RERUN_WORKER_DOCKER_NETWORK_MODE=host", workerDockerNetworkModeEnvVar)
+}
+
+func (s *AgentTestSuite) TestDefaultAgentDockeModes() {
+	configDir := createConfigFile()
+	defer os.Remove(configDir)
+
+	s.agent.ConfigDirOverride = configDir
+
+	authTs := s.mockAuthServer()
+	defer authTs.Close()
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		switch path := r.URL.Path; {
+		case path == "/task/poll":
+			io.WriteString(w, dummyTaskResponse)
+		case strings.HasSuffix(path, "/update"):
+			io.WriteString(w, "")
+		case path == "/heartbeat":
+			io.WriteString(w, "")
+		default:
+			s.FailNow(fmt.Sprintf("unknown path %v", r.URL.Path))
+		}
+	}))
+	defer ts.Close()
+
+	os.Setenv("RESIM_AGENT_ONE_TASK", "true")
+	defer os.Unsetenv("RESIM_AGENT_ONE_TASK")
+
+	os.Setenv("RESIM_AGENT_AUTH_HOST", authTs.URL)
+	defer os.Unsetenv("RESIM_AGENT_AUTH_HOST")
+
+	os.Setenv("RESIM_AGENT_API_HOST", ts.URL)
+	defer os.Unsetenv("RESIM_AGENT_API_HOST")
+
+	var taskInput Task
+	json.Unmarshal([]byte(dummyTaskResponse), &taskInput)
+
+	ioR := io.NopCloser(strings.NewReader("thing"))
+	s.mockDocker.On(
+		"ImagePull",
+		mock.Anything,
+		"public.ecr.aws/resim/experience-worker:ef41d3b7a46a502fef074eb1fd0a1aff54f7a538",
+		mock.Anything).
+		Return(ioR, nil).Once()
+
+	containerID := uuid.UUID.String(uuid.New())
+
+	var workerPrivilegedEnvVar string
+	var workerDockerNetworkModeEnvVar string
+	s.mockDocker.On(
+		"ContainerCreate",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		*taskInput.TaskName,
+	).Run(func(args mock.Arguments) {
+		containerConfig := args.Get(1).(*container.Config)
+		for _, envVar := range containerConfig.Env {
+			if strings.HasPrefix(envVar, "RERUN_WORKER_PRIVILEGED") {
+				workerPrivilegedEnvVar = envVar
+			}
+			if strings.HasPrefix(envVar, "RERUN_WORKER_DOCKER_NETWORK_MODE") {
+				workerDockerNetworkModeEnvVar = envVar
+			}
+		}
+	}).Return(container.CreateResponse{
+		ID: containerID,
+	}, nil).Once()
+
+	s.mockDocker.On(
+		"ContainerStart",
+		mock.Anything,
+		containerID,
+		container.StartOptions{},
+	).Return(nil).Once()
+
+	runningContainer := createTestContainer("running", true)
+	s.mockDocker.On("ContainerInspect", mock.Anything, containerID).Return(runningContainer, nil).Once()
+
+	succeededContainer := createTestContainer("succeeded", false)
+	s.mockDocker.On("ContainerInspect", mock.Anything, containerID).Return(succeededContainer, nil).Once()
+
+	err := s.agent.Start()
+	s.NoError(err)
+
+	// check the agent is running in privileged mode
+	s.Equal(false, s.agent.Privileged)
+	// check the agent uses the default bridge network mode
+	s.Equal(DockerNetworkModeBridge, s.agent.NetworkMode)
+	// check privileged mode is not set
+	s.Empty(workerPrivilegedEnvVar)
+	// check docker network mode is being passed through to the worker
+	s.Equal("RERUN_WORKER_DOCKER_NETWORK_MODE=bridge", workerDockerNetworkModeEnvVar)
 }
 
 func (s *AgentTestSuite) mockAuthServer() *httptest.Server {

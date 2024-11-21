@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -11,6 +12,13 @@ import (
 
 	"github.com/spf13/viper"
 	"gopkg.in/natefinch/lumberjack.v2"
+)
+
+type DockerNetworkMode string
+
+const (
+	DockerNetworkModeBridge DockerNetworkMode = "bridge"
+	DockerNetworkModeHost   DockerNetworkMode = "host"
 )
 
 const (
@@ -30,11 +38,20 @@ const (
 	AutoUpdateKey           = "auto-update"
 	PrivilegedKey           = "privileged"
 	PrivilegedDefault       = false
-	NetworkHost             = "network-host"
-	NetworkHostDefault      = false
+	NetworkModeKey          = "docker-network-mode"
+	NetworkModeDefault      = string(DockerNetworkModeBridge)
 	ConfigPath              = "$HOME/resim"
 	CredentialCacheFilename = "cache.json"
 )
+
+func parseNetworkMode(mode string) (DockerNetworkMode, error) {
+	switch DockerNetworkMode(mode) {
+	case DockerNetworkModeBridge, DockerNetworkModeHost:
+		return DockerNetworkMode(mode), nil
+	default:
+		return DockerNetworkModeBridge, errors.New("invalid network mode")
+	}
+}
 
 func (a *Agent) LoadConfig() error {
 	configDir, err := a.GetConfigDir()
@@ -64,8 +81,11 @@ func (a *Agent) LoadConfig() error {
 	viper.SetDefault(PrivilegedKey, PrivilegedDefault)
 	a.Privileged = viper.GetBool(PrivilegedKey)
 
-	viper.SetDefault(NetworkHost, NetworkHostDefault)
-	a.NetworkHost = viper.GetBool(NetworkHost)
+	viper.SetDefault(NetworkModeKey, NetworkModeDefault)
+	a.NetworkMode, err = parseNetworkMode(viper.GetString(NetworkModeKey))
+	if err != nil {
+		log.Fatalf("Agent only supports %v or %v for docker network mode", DockerNetworkModeBridge, DockerNetworkModeHost)
+	}
 
 	viper.SetDefault(APIHostKey, APIHostDefault)
 	viper.SetDefault(AuthHostKey, AuthHostDefault)
@@ -97,7 +117,7 @@ func (a *Agent) LoadConfig() error {
 		"name", a.Name,
 		"poolLabels", a.PoolLabels,
 		"privileged", a.Privileged,
-		"networkHost", a.NetworkHost,
+		"networkMode", a.NetworkMode,
 		"one_task", viper.GetBool(OneTaskKey),
 	)
 
