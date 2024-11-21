@@ -193,7 +193,7 @@ func (s *AgentTestSuite) TestPrivilegedModeHostMode() {
 	// check the agent is running in privileged mode
 	s.Equal(true, s.agent.Privileged)
 	// check the agent uses the default bridge network mode
-	s.Equal(DockerNetworkModeHost, s.agent.NetworkMode)
+	s.Equal(DockerNetworkModeHost, s.agent.DockerNetworkMode)
 	// check privileged mode is being passed through to the worker
 	s.Equal("RERUN_WORKER_PRIVILEGED=true", workerPrivilegedEnvVar)
 	// check docker network mode is being passed through to the worker
@@ -289,7 +289,7 @@ func (s *AgentTestSuite) TestDefaultAgentDockeModes() {
 	// check the agent is running in privileged mode
 	s.Equal(false, s.agent.Privileged)
 	// check the agent uses the default bridge network mode
-	s.Equal(DockerNetworkModeBridge, s.agent.NetworkMode)
+	s.Equal(DockerNetworkModeBridge, s.agent.DockerNetworkMode)
 	// check privileged mode is not set
 	s.Empty(workerPrivilegedEnvVar)
 	// check docker network mode is being passed through to the worker

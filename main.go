@@ -58,7 +58,7 @@ type Agent struct {
 	CurrentTaskStatus api.TaskStatus
 	AutoUpdate        bool
 	Privileged        bool
-	NetworkMode       DockerNetworkMode
+	DockerNetworkMode DockerNetworkMode
 }
 
 type Task api.TaskPollOutput
@@ -254,7 +254,7 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 	providedEnvVars := StringifyEnvironmentVariables(*task.WorkerEnvironmentVariables)
 	extraEnvVars := []string{
 		"RERUN_WORKER_ENVIRONMENT=dev",
-		fmt.Sprintf("RERUN_WORKER_DOCKER_NETWORK_MODE=%v", a.NetworkMode),
+		fmt.Sprintf("RERUN_WORKER_DOCKER_NETWORK_MODE=%v", a.DockerNetworkMode),
 	}
 	if a.Privileged {
 		extraEnvVars = append(extraEnvVars, "RERUN_WORKER_PRIVILEGED=true")

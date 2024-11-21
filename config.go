@@ -82,7 +82,7 @@ func (a *Agent) LoadConfig() error {
 	a.Privileged = viper.GetBool(PrivilegedKey)
 
 	viper.SetDefault(NetworkModeKey, NetworkModeDefault)
-	a.NetworkMode, err = parseNetworkMode(viper.GetString(NetworkModeKey))
+	a.DockerNetworkMode, err = parseNetworkMode(viper.GetString(NetworkModeKey))
 	if err != nil {
 		log.Fatalf("Agent only supports %v or %v for docker network mode", DockerNetworkModeBridge, DockerNetworkModeHost)
 	}
@@ -117,7 +117,7 @@ func (a *Agent) LoadConfig() error {
 		"name", a.Name,
 		"poolLabels", a.PoolLabels,
 		"privileged", a.Privileged,
-		"networkMode", a.NetworkMode,
+		"dockerNetworkMode", a.DockerNetworkMode,
 		"one_task", viper.GetBool(OneTaskKey),
 	)
 
