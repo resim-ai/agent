@@ -24,7 +24,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const agentVersion = "v0.2.3"
+const agentVersion = "v0.2.4"
 
 type agentStatus string
 
@@ -58,6 +58,7 @@ type Agent struct {
 	CurrentTaskStatus api.TaskStatus
 	AutoUpdate        bool
 	Privileged        bool
+	DockerNetworkMode DockerNetworkMode
 }
 
 type Task api.TaskPollOutput
@@ -253,6 +254,7 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 	providedEnvVars := StringifyEnvironmentVariables(*task.WorkerEnvironmentVariables)
 	extraEnvVars := []string{
 		"RERUN_WORKER_ENVIRONMENT=dev",
+		fmt.Sprintf("RERUN_WORKER_DOCKER_NETWORK_MODE=%v", a.DockerNetworkMode),
 	}
 	if a.Privileged {
 		extraEnvVars = append(extraEnvVars, "RERUN_WORKER_PRIVILEGED=true")
@@ -272,6 +274,7 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 		Image: *task.WorkerImageURI,
 		Env:   append(providedEnvVars, extraEnvVars...),
 	}
+
 	res, err := a.Docker.ContainerCreate(
 		context.TODO(),
 		config,
