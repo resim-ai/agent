@@ -19,6 +19,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/resim-ai/api-client/api"
 	"github.com/stretchr/testify/require"
@@ -428,7 +429,9 @@ func (s *AgentTestSuite) createAndAwaitBatch(buildID uuid.UUID, experiences []uu
 			"shouldFail":      "false",
 		},
 	}
-	fmt.Printf("DEBUG: BatchInput: %v", createBatchRequest)
+	fmt.Println("DEBUG: BatchInput:")
+	spew.Dump(createBatchRequest)
+
 	createBatchRequest.MetricsBuildID = &s.metricsBuildID
 	createBatchResponse, err := s.APIClient.CreateBatchWithResponse(
 		context.Background(),
@@ -441,7 +444,8 @@ func (s *AgentTestSuite) createAndAwaitBatch(buildID uuid.UUID, experiences []uu
 	}
 
 	batch := *createBatchResponse.JSON201
-	fmt.Printf("DEBUG: BatchResponse: %v", batch)
+	fmt.Println("DEBUG: BatchResponse:")
+	spew.Dump(batch)
 
 	s.Eventually(func() bool {
 		getResponse, err := s.APIClient.GetBatchWithResponse(
