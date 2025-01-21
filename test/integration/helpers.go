@@ -425,6 +425,7 @@ func (s *AgentTestSuite) createAndAwaitBatch(buildID uuid.UUID, experiences []uu
 		Parameters: &api.BatchParameters{
 			"buildID":         buildID.String(),
 			"repeatedBuildID": buildID.String(),
+			"shouldFail":      "false",
 		},
 	}
 	createBatchRequest.MetricsBuildID = &s.metricsBuildID
