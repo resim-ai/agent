@@ -428,6 +428,7 @@ func (s *AgentTestSuite) createAndAwaitBatch(buildID uuid.UUID, experiences []uu
 			"shouldFail":      "false",
 		},
 	}
+	fmt.Printf("DEBUG: BatchInput: %v", createBatchRequest)
 	createBatchRequest.MetricsBuildID = &s.metricsBuildID
 	createBatchResponse, err := s.APIClient.CreateBatchWithResponse(
 		context.Background(),
@@ -440,6 +441,7 @@ func (s *AgentTestSuite) createAndAwaitBatch(buildID uuid.UUID, experiences []uu
 	}
 
 	batch := *createBatchResponse.JSON201
+	fmt.Printf("DEBUG: BatchResponse: %v", batch)
 
 	s.Eventually(func() bool {
 		getResponse, err := s.APIClient.GetBatchWithResponse(
