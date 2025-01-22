@@ -88,17 +88,21 @@ func Ptr[T any](t T) *T {
 func ListExpectedOutputFiles() []string {
 	return []string{
 		TestMCAPFile,
+		fmt.Sprintf("metrics-%v", TestMCAPFile),
 		TestMP4File,
+		fmt.Sprintf("metrics-%v", TestMP4File),
 		"metrics.binproto",
+		"metrics.binproto", // from the docker metrics
 		ExpectedExperienceNameFile,
+		fmt.Sprintf("metrics-%v", ExpectedExperienceNameFile),
 		ExpectedExperienceNameBase64File,
+		fmt.Sprintf("metrics-%v", ExpectedExperienceNameBase64File),
 		"experience-worker.log",
 		"experience-container.log",
 		"metrics-worker.log",
 		"metrics-container.log",
 		"test_config.json",
-		"test_file.txt",
-		"metrics.binproto", // This is here twice because it's also regsitered by metrics job
+		"test_file.txt", // from an external file metric
 	}
 }
 
