@@ -13,6 +13,7 @@ import (
 )
 
 func (s *AgentTestSuite) SetupTest() {
+	fmt.Println("Setting up agent integration test")
 	s.createTestProject()
 	s.createTestSystem()
 	s.createTestBranch()
