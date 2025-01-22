@@ -371,13 +371,14 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 func (a *Agent) startHeartbeat(ctx context.Context) error {
 	ticker := time.NewTicker(10 * time.Second)
 
-	hbInput := api.AgentHeartbeatInput{
-		AgentName:  &a.Name,
-		PoolLabels: &a.PoolLabels,
-	}
-
 	go func() {
 		for range ticker.C {
+
+			hbInput := api.AgentHeartbeatInput{
+				AgentName:  &a.Name,
+				PoolLabels: &a.PoolLabels,
+			}
+
 			if a.CurrentTaskName != "" {
 				hbInput.TaskName = &a.CurrentTaskName
 			}
