@@ -387,10 +387,12 @@ func (a *Agent) startHeartbeat(ctx context.Context) error {
 			// taking care not to use a direct pointer to the values, as they may be
 			// updated by the main loop, but not here.
 			if a.CurrentTaskName != "" {
-				hbInput.TaskName = Ptr(a.CurrentTaskName)
+				currentTaskName := a.CurrentTaskName
+				hbInput.TaskName = &currentTaskName
 			}
 			if a.CurrentTaskStatus != "" {
-				hbInput.TaskStatus = Ptr(a.CurrentTaskStatus)
+				currentTaskStatus := a.CurrentTaskStatus
+				hbInput.TaskStatus = &currentTaskStatus
 			}
 
 			_, err := a.APIClient.AgentHeartbeat(ctx, hbInput)
