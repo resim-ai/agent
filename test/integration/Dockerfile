@@ -2,9 +2,10 @@
 # trunk-ignore(hadolint/DL3007)
 FROM 909785973729.dkr.ecr.us-east-1.amazonaws.com/rerun-end-to-end-test-experience-build:latest
 
+USER root
+
 # trunk-ignore(hadolint/DL4006)
 # trunk-ignore(hadolint/SC3037)
-USER root
 RUN mkdir -p /test_experience_data/experience_1 &&\
   touch /test_experience_data/experience_1/experience_name.txt &&\
   touch /test_experience_data/experience_1/experience_name.base64 &&\
