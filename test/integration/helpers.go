@@ -412,7 +412,7 @@ func Base64EncodeString(input string) []byte {
 	return base64Input
 }
 
-func (s *AgentTestSuite) createAndAwaitBatch(buildID uuid.UUID, experiences []uuid.UUID, isDocker bool) api.Batch {
+func (s *AgentTestSuite) createAndAwaitBatch(buildID uuid.UUID, experiences []uuid.UUID, isDocker bool, realMetrics bool) api.Batch {
 	var poolLabels []string
 	if isDocker {
 		poolLabels = []string{
@@ -433,7 +433,10 @@ func (s *AgentTestSuite) createAndAwaitBatch(buildID uuid.UUID, experiences []uu
 		},
 	}
 
-	createBatchRequest.MetricsBuildID = &s.metricsBuildID
+	if realMetrics {
+		createBatchRequest.MetricsBuildID = &s.metricsBuildID
+	}
+
 	createBatchResponse, err := s.APIClient.CreateBatchWithResponse(
 		context.Background(),
 		s.projectID,

@@ -56,7 +56,7 @@ func TestAgentTestSuite(t *testing.T) {
 // Test the agent with a batch where the experiences are in S3
 func (s *AgentTestSuite) TestAgentWithS3Experience() {
 	s.createS3TestExperience()
-	batch := s.createAndAwaitBatch(s.buildIDS3, s.s3Experiences, false)
+	batch := s.createAndAwaitBatch(s.buildIDS3, s.s3Experiences, false, true)
 	jobsResponse, err := s.APIClient.ListJobsWithResponse(
 		context.Background(),
 		s.projectID,
@@ -96,7 +96,7 @@ func (s *AgentTestSuite) TestAgentWithS3Experience() {
 // Test the agent with a batch where the experiences are baked into the image
 func (s *AgentTestSuite) TestAgentWithLocalExperience() {
 	s.createLocalTestExperiences()
-	batch := s.createAndAwaitBatch(s.buildIDLocal, s.localExperiences, false)
+	batch := s.createAndAwaitBatch(s.buildIDLocal, s.localExperiences, false, false)
 	jobsResponse, err := s.APIClient.ListJobsWithResponse(
 		context.Background(),
 		s.projectID,
@@ -136,7 +136,7 @@ func (s *AgentTestSuite) TestAgentWithLocalExperience() {
 // Test the agent with a batch where the experiences are in S3
 func (s *AgentTestSuite) TestDockerAgentWithS3Experience() {
 	s.createS3TestExperience()
-	batch := s.createAndAwaitBatch(s.buildIDS3, s.s3Experiences, true)
+	batch := s.createAndAwaitBatch(s.buildIDS3, s.s3Experiences, true, true)
 	jobsResponse, err := s.APIClient.ListJobsWithResponse(
 		context.Background(),
 		s.projectID,
