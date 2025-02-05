@@ -107,7 +107,7 @@ func ListExpectedOutputFiles(realMetrics bool) []string {
 			fmt.Sprintf("metrics-%v", ExpectedExperienceNameBase64File),
 			"test_config.json",
 			"test_file.txt", // from an external file metric
-			}...)
+		}...)
 	}
 
 	return expectedOutputFiles
