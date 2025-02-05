@@ -85,24 +85,30 @@ func Ptr[T any](t T) *T {
 }
 
 func ListExpectedOutputFiles(realMetrics bool) []string {
-	return []string{
+	expectedOutputFiles := []string{
 		TestMCAPFile,
-		fmt.Sprintf("metrics-%v", TestMCAPFile),
 		TestMP4File,
-		fmt.Sprintf("metrics-%v", TestMP4File),
 		"metrics.binproto",
-		"metrics.binproto", // from the docker metrics
-		ExpectedExperienceNameFile,
-		fmt.Sprintf("metrics-%v", ExpectedExperienceNameFile),
-		ExpectedExperienceNameBase64File,
-		fmt.Sprintf("metrics-%v", ExpectedExperienceNameBase64File),
 		"experience-worker.log",
 		"experience-container.log",
 		"metrics-worker.log",
 		"metrics-container.log",
+		ExpectedExperienceNameFile,
+		ExpectedExperienceNameBase64File,
 		"test_config.json",
-		"test_file.txt", // from an external file metric
 	}
+
+	if realMetrics {
+		expectedOutputFiles = append(expectedOutputFiles, []string{
+			fmt.Sprintf("metrics-%v", TestMCAPFile),
+			fmt.Sprintf("metrics-%v", TestMP4File),
+			fmt.Sprintf("metrics-%v", ExpectedExperienceNameFile),
+			fmt.Sprintf("metrics-%v", ExpectedExperienceNameBase64File),
+			"test_file.txt", // from an external file metric
+			}...)
+	}
+
+	return expectedOutputFiles
 }
 
 func CheckAPIAvailability(ctx context.Context, endpoint string, interval time.Duration) error {
