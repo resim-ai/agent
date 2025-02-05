@@ -1,7 +1,12 @@
 <!-- markdownlint-disable MD041 -->
+
 # Changelog
 
 Changes and release notes for the ReSim agent
+
+## v0.2.6 - 2025-01-21
+
+- Fixes missing parameter in integration test
 
 ## v0.2.5 - 2024-11-21
 

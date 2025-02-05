@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-20.04
     outputs:
       message: ${{ steps.scan-message.outputs.message }}
-      body: ${{ steps.scan-message.outputs.body }}
+      body: ${{ steps.scan-output.outputs.body }}
 
     steps:
       - name: Checkout code
@@ -74,7 +74,7 @@ jobs:
         if: always()
         run: |
           {
-            echo 'TEST_OUTPUT<<EOF'
+            echo 'body<<EOF'
             awk 1 ORS='\n' < vuln.output
             echo EOF
           } > "$GITHUB_OUTPUT"
@@ -82,14 +82,12 @@ jobs:
       - name: Generate scan message
         id: scan-message
         env:
-          RESULT: ${{ steps.scan-output.outputs.TEST_OUTPUT }}
+          RESULT: ${{ steps.scan-output.outputs.body }}
         run: |
           if [ "$RESULT" = "" ]; then
                     echo "message=:tada: No vulnerabilities found!" >>"$GITHUB_OUTPUT"
-                    echo "body=No vulnerabilities found!" >>"$GITHUB_OUTPUT"
           else
                     echo "message=:warning: Vulnerabilites found!" >>"$GITHUB_OUTPUT"
-                    echo "body=$RESULT" >>"$GITHUB_OUTPUT"
           fi
 
   deployment_bot_comment:

@@ -24,7 +24,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const agentVersion = "v0.2.5"
+const agentVersion = "v0.2.6"
 
 type agentStatus string
 
@@ -368,21 +368,31 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 	return nil
 }
 
+func Ptr[T any](t T) *T {
+	return &t
+}
+
 func (a *Agent) startHeartbeat(ctx context.Context) error {
 	ticker := time.NewTicker(10 * time.Second)
 
-	hbInput := api.AgentHeartbeatInput{
-		AgentName:  &a.Name,
-		PoolLabels: &a.PoolLabels,
-	}
-
 	go func() {
 		for range ticker.C {
+
+			hbInput := api.AgentHeartbeatInput{
+				AgentName:  &a.Name,
+				PoolLabels: &a.PoolLabels,
+			}
+
+			// If we have a task, send the task name and status in the heartbeat,
+			// taking care not to use a direct pointer to the values, as they may be
+			// updated by the main loop, but not here.
 			if a.CurrentTaskName != "" {
-				hbInput.TaskName = &a.CurrentTaskName
+				currentTaskName := a.CurrentTaskName
+				hbInput.TaskName = &currentTaskName
 			}
 			if a.CurrentTaskStatus != "" {
-				hbInput.TaskStatus = &a.CurrentTaskStatus
+				currentTaskStatus := a.CurrentTaskStatus
+				hbInput.TaskStatus = &currentTaskStatus
 			}
 
 			_, err := a.APIClient.AgentHeartbeat(ctx, hbInput)

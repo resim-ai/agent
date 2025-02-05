@@ -84,21 +84,33 @@ func Ptr[T any](t T) *T {
 	return &t
 }
 
-func ListExpectedOutputFiles() []string {
-	return []string{
+func ListExpectedOutputFiles(realMetrics bool) []string {
+	expectedOutputFiles := []string{
 		TestMCAPFile,
 		TestMP4File,
 		"metrics.binproto",
-		ExpectedExperienceNameFile,
-		ExpectedExperienceNameBase64File,
 		"experience-worker.log",
 		"experience-container.log",
 		"metrics-worker.log",
 		"metrics-container.log",
+		ExpectedExperienceNameFile,
+		ExpectedExperienceNameBase64File,
 		"test_config.json",
-		"test_file.txt",
-		"metrics.binproto", // This is here twice because it's also regsitered by metrics job
 	}
+
+	if realMetrics {
+		expectedOutputFiles = append(expectedOutputFiles, []string{
+			"metrics.binproto",
+			fmt.Sprintf("metrics-%v", TestMCAPFile),
+			fmt.Sprintf("metrics-%v", TestMP4File),
+			fmt.Sprintf("metrics-%v", ExpectedExperienceNameFile),
+			fmt.Sprintf("metrics-%v", ExpectedExperienceNameBase64File),
+			"test_config.json",
+			"test_file.txt", // from an external file metric
+		}...)
+	}
+
+	return expectedOutputFiles
 }
 
 func CheckAPIAvailability(ctx context.Context, endpoint string, interval time.Duration) error {
@@ -408,7 +420,7 @@ func Base64EncodeString(input string) []byte {
 	return base64Input
 }
 
-func (s *AgentTestSuite) createAndAwaitBatch(buildID uuid.UUID, experiences []uuid.UUID, isDocker bool) api.Batch {
+func (s *AgentTestSuite) createAndAwaitBatch(buildID uuid.UUID, experiences []uuid.UUID, isDocker bool, realMetrics bool) api.Batch {
 	var poolLabels []string
 	if isDocker {
 		poolLabels = []string{
@@ -425,9 +437,14 @@ func (s *AgentTestSuite) createAndAwaitBatch(buildID uuid.UUID, experiences []uu
 		Parameters: &api.BatchParameters{
 			"buildID":         buildID.String(),
 			"repeatedBuildID": buildID.String(),
+			"shouldFail":      "false",
 		},
 	}
-	createBatchRequest.MetricsBuildID = &s.metricsBuildID
+
+	if realMetrics {
+		createBatchRequest.MetricsBuildID = &s.metricsBuildID
+	}
+
 	createBatchResponse, err := s.APIClient.CreateBatchWithResponse(
 		context.Background(),
 		s.projectID,
