@@ -84,7 +84,7 @@ func Ptr[T any](t T) *T {
 	return &t
 }
 
-func ListExpectedOutputFiles() []string {
+func ListExpectedOutputFiles(realMetrics bool) []string {
 	return []string{
 		TestMCAPFile,
 		fmt.Sprintf("metrics-%v", TestMCAPFile),
