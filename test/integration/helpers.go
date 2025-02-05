@@ -100,10 +100,12 @@ func ListExpectedOutputFiles(realMetrics bool) []string {
 
 	if realMetrics {
 		expectedOutputFiles = append(expectedOutputFiles, []string{
+			"metrics.binproto",
 			fmt.Sprintf("metrics-%v", TestMCAPFile),
 			fmt.Sprintf("metrics-%v", TestMP4File),
 			fmt.Sprintf("metrics-%v", ExpectedExperienceNameFile),
 			fmt.Sprintf("metrics-%v", ExpectedExperienceNameBase64File),
+			"test_config.json",
 			"test_file.txt", // from an external file metric
 			}...)
 	}
