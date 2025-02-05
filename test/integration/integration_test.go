@@ -55,8 +55,9 @@ func TestAgentTestSuite(t *testing.T) {
 
 // Test the agent with a batch where the experiences are in S3
 func (s *AgentTestSuite) TestAgentWithS3Experience() {
+	realMetrics := true
 	s.createS3TestExperience()
-	batch := s.createAndAwaitBatch(s.buildIDS3, s.s3Experiences, false, true)
+	batch := s.createAndAwaitBatch(s.buildIDS3, s.s3Experiences, false, realMetrics)
 	jobsResponse, err := s.APIClient.ListJobsWithResponse(
 		context.Background(),
 		s.projectID,
@@ -67,7 +68,7 @@ func (s *AgentTestSuite) TestAgentWithS3Experience() {
 
 	s.NoError(err)
 	s.Len(*jobsResponse.JSON200.Jobs, 1)
-	expectedOutputFiles := ListExpectedOutputFiles()
+	expectedOutputFiles := ListExpectedOutputFiles(realMetrics)
 
 	printLogs := *batch.Status != api.BatchStatusSUCCEEDED // we will print urls to logs if the batch did not succeed
 	// Finally: for every job in the batch, list the logs:
@@ -95,8 +96,9 @@ func (s *AgentTestSuite) TestAgentWithS3Experience() {
 
 // Test the agent with a batch where the experiences are baked into the image
 func (s *AgentTestSuite) TestAgentWithLocalExperience() {
+	realMetrics := false
 	s.createLocalTestExperiences()
-	batch := s.createAndAwaitBatch(s.buildIDLocal, s.localExperiences, false, false)
+	batch := s.createAndAwaitBatch(s.buildIDLocal, s.localExperiences, false, realMetrics)
 	jobsResponse, err := s.APIClient.ListJobsWithResponse(
 		context.Background(),
 		s.projectID,
@@ -107,7 +109,7 @@ func (s *AgentTestSuite) TestAgentWithLocalExperience() {
 
 	s.NoError(err)
 	s.Len(*jobsResponse.JSON200.Jobs, 1)
-	expectedOutputFiles := ListExpectedOutputFiles()
+	expectedOutputFiles := ListExpectedOutputFiles(realMetrics)
 
 	printLogs := *batch.Status != api.BatchStatusSUCCEEDED // we will print urls to logs if the batch did not succeed
 	// Finally: for every job in the batch, list the logs:
@@ -135,8 +137,9 @@ func (s *AgentTestSuite) TestAgentWithLocalExperience() {
 
 // Test the agent with a batch where the experiences are in S3
 func (s *AgentTestSuite) TestDockerAgentWithS3Experience() {
+	realMetrics := true
 	s.createS3TestExperience()
-	batch := s.createAndAwaitBatch(s.buildIDS3, s.s3Experiences, true, true)
+	batch := s.createAndAwaitBatch(s.buildIDS3, s.s3Experiences, true, realMetrics)
 	jobsResponse, err := s.APIClient.ListJobsWithResponse(
 		context.Background(),
 		s.projectID,
@@ -147,7 +150,7 @@ func (s *AgentTestSuite) TestDockerAgentWithS3Experience() {
 
 	s.NoError(err)
 	s.Len(*jobsResponse.JSON200.Jobs, 1)
-	expectedOutputFiles := ListExpectedOutputFiles()
+	expectedOutputFiles := ListExpectedOutputFiles(realMetrics)
 
 	printLogs := *batch.Status != api.BatchStatusSUCCEEDED // we will print urls to logs if the batch did not succeed
 	// Finally: for every job in the batch, list the logs:
