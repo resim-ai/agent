@@ -235,6 +235,10 @@ github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRI
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/resim-ai/api-client v0.3.8 h1:HtM39RNXxQTmyCYYV/j89GefdF3KnMkmqvCealFTDO8=
 github.com/resim-ai/api-client v0.3.8/go.mod h1:AXe4yLII8PE7m3DLPetL+DiTu18S+aI22EzEMMyLNGU=
+github.com/resim-ai/api-client v0.4.0 h1:7iIspm5L/hevxRrTEvgvY1NC+MUPRtGZ40Lap78E8So=
+github.com/resim-ai/api-client v0.4.0/go.mod h1:wvlKfwYB6fBYdl5PZ7LdxjaHIjfEloBvLCEriYkLRmo=
+github.com/resim-ai/api-client v0.5.0 h1:VmtrzMGhs4T1yNmBVO0dYmYgh25qy7eBVZkww0p1yF4=
+github.com/resim-ai/api-client v0.5.0/go.mod h1:wvlKfwYB6fBYdl5PZ7LdxjaHIjfEloBvLCEriYkLRmo=
 github.com/rogpeppe/go-internal v1.13.1 h1:KvO1DLK/DRN07sQ1LQKScxyZJuNnedQ5/wKSR38lUII=
 github.com/rogpeppe/go-internal v1.13.1/go.mod h1:uMEvuHeurkdAXX61udpOXGD/AzZDWNMNyH2VO9fmH0o=
 github.com/sagikazarmark/locafero v0.7.0 h1:5MqpDsTGNDhY8sGp0Aowyf0qKsPrhewaLSsFaodPcyo=

@@ -346,7 +346,7 @@ func (s *AgentTestSuite) createLocalTestExperiences(timeout *int32) {
 		Location:    testLocation1,
 	}
 	if timeout != nil {
-		createExperienceRequest.ContainerTimeout = timeout
+		createExperienceRequest.ContainerTimeoutSeconds = timeout
 	}
 
 	createExperienceResponse, err := s.APIClient.CreateExperienceWithResponse(
