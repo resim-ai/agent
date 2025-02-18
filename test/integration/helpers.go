@@ -96,6 +96,7 @@ func ListExpectedOutputFiles(realMetrics bool) []string {
 		ExpectedExperienceNameFile,
 		ExpectedExperienceNameBase64File,
 		"test_config.json",
+		"test.rrd",
 	}
 
 	if realMetrics {
@@ -107,6 +108,7 @@ func ListExpectedOutputFiles(realMetrics bool) []string {
 			fmt.Sprintf("metrics-%v", ExpectedExperienceNameBase64File),
 			"test_config.json",
 			"test_file.txt", // from an external file metric
+			"test.rrd",
 		}...)
 	}
 
