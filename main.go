@@ -333,17 +333,41 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 	if err != nil {
 		return err
 	}
+	startTime := time.Now()
+	containerTimeout, err := time.ParseDuration(task.ContainerTimeout)
+	if err != nil {
+		slog.Warn("Error parsing container timeout, using default of 1 hour", "err", err)
+		containerTimeout = time.Hour
+	}
+
 	slog.Info("Container for task starting", "task", *task.TaskName)
 	taskStateChan <- taskStatusMessage{
 		Name:   *task.TaskName,
 		Status: api.RUNNING,
 	}
 	a.setCurrentTask(*task.TaskName, api.RUNNING)
+
 	for {
 		status, err := a.Docker.ContainerInspect(ctx, res.ID)
 		if err != nil {
 			return err
 		}
+
+		if time.Since(startTime) > containerTimeout {
+			slog.Error("Container timeout exceeded", "task", *task.TaskName, "timeout", containerTimeout)
+			// Stop the container, giving it 30 seconds to finish after sending SIGTERM
+			err := a.Docker.ContainerStop(ctx, res.ID, container.StopOptions{Timeout: Ptr(30)})
+			if err != nil {
+				slog.Error("Failed to stop container", "err", err)
+			}
+			taskStateChan <- taskStatusMessage{
+				Name:   *task.TaskName,
+				Status: api.ERROR,
+			}
+			a.setCurrentTask("", "")
+			break
+		}
+
 		if status.State.Status != "running" {
 			if status.State.ExitCode == 0 {
 				slog.Info("Container for task succeeded", "task", *task.TaskName)

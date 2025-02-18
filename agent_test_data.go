@@ -16,6 +16,7 @@ const dummyTaskResponse = `{
     ]
   ],
   "taskName": "f6b585cb-24f7-4b5c-be8e-76347b94bd09-experience",
+  "containerTimeout": "1h",
   "workerEnvironmentVariables": [
     [
       "RERUN_WORKER_WORKER_API_URL",

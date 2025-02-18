@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -295,6 +296,86 @@ func (s *AgentTestSuite) TestDefaultAgentDockeModes() {
 	s.Empty(workerPrivilegedEnvVar)
 	// check docker network mode is being passed through to the worker
 	s.Equal("RERUN_WORKER_DOCKER_NETWORK_MODE=bridge", workerDockerNetworkModeEnvVar)
+}
+
+func (s *AgentTestSuite) TestContainerTimeout() {
+	configDir := createConfigFile()
+	defer os.Remove(configDir)
+
+	s.agent.ConfigDirOverride = configDir
+
+	authTs := s.mockAuthServer()
+	defer authTs.Close()
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		switch path := r.URL.Path; {
+		case path == "/task/poll":
+			io.WriteString(w, dummyTaskResponse)
+		case strings.HasSuffix(path, "/update"):
+			io.WriteString(w, "")
+		case path == "/heartbeat":
+			io.WriteString(w, "")
+		default:
+			s.FailNow(fmt.Sprintf("unknown path %v", r.URL.Path))
+		}
+	}))
+	defer ts.Close()
+
+	os.Setenv("RESIM_AGENT_ONE_TASK", "true")
+	defer os.Unsetenv("RESIM_AGENT_ONE_TASK")
+
+	os.Setenv("RESIM_AGENT_AUTH_HOST", authTs.URL)
+	defer os.Unsetenv("RESIM_AGENT_AUTH_HOST")
+
+	os.Setenv("RESIM_AGENT_API_HOST", ts.URL)
+	defer os.Unsetenv("RESIM_AGENT_API_HOST")
+
+	var taskInput Task
+	json.Unmarshal([]byte(dummyTaskResponse), &taskInput)
+
+	ioR := io.NopCloser(strings.NewReader("thing"))
+	s.mockDocker.On(
+		"ImagePull",
+		mock.Anything,
+		"public.ecr.aws/resim/experience-worker:ef41d3b7a46a502fef074eb1fd0a1aff54f7a538",
+		mock.Anything).
+		Return(ioR, nil).Once()
+
+	containerID := uuid.UUID.String(uuid.New())
+
+	s.mockDocker.On(
+		"ContainerCreate",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		*taskInput.TaskName,
+	).Return(container.CreateResponse{
+		ID: containerID,
+	}, nil).Once()
+
+	s.mockDocker.On(
+		"ContainerStart",
+		mock.Anything,
+		containerID,
+		container.StartOptions{},
+	).Return(nil).Once()
+
+	// Container stays running until timeout
+	runningContainer := createTestContainer("running", true)
+	s.mockDocker.On("ContainerInspect", mock.Anything, containerID).Return(runningContainer, nil).Times(3)
+
+	// Mock the container stop call that should happen on timeout
+	stopTimeout := 30 * time.Second
+	s.mockDocker.On("ContainerStop", mock.Anything, containerID, &stopTimeout).Return(nil).Once()
+
+	err := s.agent.Start()
+	s.NoError(err)
+
+	// Verify the container was stopped due to timeout
+	s.mockDocker.AssertCalled(s.T(), "ContainerStop", mock.Anything, containerID, &stopTimeout)
 }
 
 func (s *AgentTestSuite) mockAuthServer() *httptest.Server {
