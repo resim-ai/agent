@@ -4,6 +4,10 @@
 
 Changes and release notes for the ReSim agent
 
+## v0.3.0 - 2025-02-19
+
+- Introduces support for container timeouts, as defined in the experience's metadata. A 30s SIGTERM is sent to the container, and if it hasn't exited by then, the container is forcibly stopped.
+
 ## v0.2.6 - 2025-01-21
 
 - Fixes missing parameter in integration test
