@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -307,12 +306,19 @@ func (s *AgentTestSuite) TestContainerTimeout() {
 	authTs := s.mockAuthServer()
 	defer authTs.Close()
 
+	// parse, then set the container timeout to 0s
+	var taskInput Task
+	json.Unmarshal([]byte(dummyTaskResponse), &taskInput)
+	taskInput.ContainerTimeout = "0s"
+	timeoutTaskResponse, _ := json.Marshal(taskInput)
+	timeoutTaskResponseString := string(timeoutTaskResponse)
+
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		switch path := r.URL.Path; {
 		case path == "/task/poll":
-			io.WriteString(w, dummyTaskResponse)
+			io.WriteString(w, timeoutTaskResponseString)
 		case strings.HasSuffix(path, "/update"):
 			io.WriteString(w, "")
 		case path == "/heartbeat":
@@ -331,9 +337,6 @@ func (s *AgentTestSuite) TestContainerTimeout() {
 
 	os.Setenv("RESIM_AGENT_API_HOST", ts.URL)
 	defer os.Unsetenv("RESIM_AGENT_API_HOST")
-
-	var taskInput Task
-	json.Unmarshal([]byte(dummyTaskResponse), &taskInput)
 
 	ioR := io.NopCloser(strings.NewReader("thing"))
 	s.mockDocker.On(
@@ -365,17 +368,17 @@ func (s *AgentTestSuite) TestContainerTimeout() {
 
 	// Container stays running until timeout
 	runningContainer := createTestContainer("running", true)
-	s.mockDocker.On("ContainerInspect", mock.Anything, containerID).Return(runningContainer, nil).Times(3)
+	s.mockDocker.On("ContainerInspect", mock.Anything, containerID).Return(runningContainer, nil).Once()
 
 	// Mock the container stop call that should happen on timeout
-	stopTimeout := 30 * time.Second
-	s.mockDocker.On("ContainerStop", mock.Anything, containerID, &stopTimeout).Return(nil).Once()
+	stopOptions := container.StopOptions{Timeout: Ptr(30)}
+	s.mockDocker.On("ContainerStop", mock.Anything, containerID, stopOptions).Return(nil).Once()
 
 	err := s.agent.Start()
 	s.NoError(err)
 
 	// Verify the container was stopped due to timeout
-	s.mockDocker.AssertCalled(s.T(), "ContainerStop", mock.Anything, containerID, &stopTimeout)
+	s.mockDocker.AssertCalled(s.T(), "ContainerStop", mock.Anything, containerID, stopOptions)
 }
 
 func (s *AgentTestSuite) mockAuthServer() *httptest.Server {
