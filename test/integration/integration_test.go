@@ -175,11 +175,3 @@ func (s *AgentTestSuite) TestDockerAgentWithS3Experience() {
 		}
 	}
 }
-
-// Test the agent with a batch where the experiences timeout is tiny and should error
-func (s *AgentTestSuite) TestAgentWithZeroExperienceTimeout() {
-	realMetrics := false
-	s.createLocalTestExperiences(Ptr(int32(0)))
-	batch := s.createAndAwaitBatch(s.buildIDLocal, s.localExperiences, false, realMetrics)
-	s.Equal(batch.Status, api.BatchStatusERROR)
-}

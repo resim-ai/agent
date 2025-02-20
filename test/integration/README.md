@@ -57,3 +57,5 @@ Then run the following in a different terminal, and wait:
 ```shell
 go test -v ./test/integration
 ```
+
+Note: if you are running this within the devcontainer, you will need to make sure there is a `/tmp/resim` directory on the host machine that the agent is running on and that the `.docker` directory is mounted into the container.
