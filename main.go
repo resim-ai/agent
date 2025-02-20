@@ -133,7 +133,6 @@ func (a *Agent) Start() error {
 		for {
 			select {
 			case taskStatusMessage := <-taskStateChan:
-				fmt.Println("Updating task status", "task_name", taskStatusMessage.Name, "status", taskStatusMessage.Status)
 				err := a.updateTaskStatus(ctx, taskStatusMessage.Name, taskStatusMessage.Status)
 				if err != nil {
 					slog.Error("Error updating task status", "err", err)
