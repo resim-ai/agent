@@ -133,7 +133,11 @@ func (a *Agent) Start() error {
 		for {
 			select {
 			case taskStatusMessage := <-taskStateChan:
-				a.updateTaskStatus(ctx, taskStatusMessage.Name, taskStatusMessage.Status)
+				fmt.Println("Updating task status", "task_name", taskStatusMessage.Name, "status", taskStatusMessage.Status)
+				err := a.updateTaskStatus(ctx, taskStatusMessage.Name, taskStatusMessage.Status)
+				if err != nil {
+					slog.Error("Error updating task status", "err", err)
+				}
 			case agentStatus := <-agentStateChan:
 				a.Status = agentStatus
 			}
@@ -160,16 +164,32 @@ func (a *Agent) Start() error {
 		slog.Info("Got new task", "task_name", *task.TaskName)
 
 		taskStateChan <- taskStatusMessage{
-			Name: *task.TaskName,
-			// TODO: set this back to STARTING
-			Status: "SUBMITTED",
+			Name:   *task.TaskName,
+			Status: api.SUBMITTED,
 		}
 		agentStateChan <- agentStatusRunning
-		a.pullImage(ctx, *task.WorkerImageURI)
 
-		err := a.runWorker(ctx, Task(task), taskStateChan)
+		// Attempt to pull the worker image; if this fails, we need to error
+		// the task.
+		err := a.pullImage(ctx, *task.WorkerImageURI)
+		if err != nil {
+			slog.Error("Error pulling image", "err", err)
+			taskStateChan <- taskStatusMessage{
+				Name:   *task.TaskName,
+				Status: api.ERROR,
+			}
+			continue
+		}
+
+		// Attempt to run the worker; if this fails, we need to error the task.
+		err = a.runWorker(ctx, Task(task), taskStateChan)
 		if err != nil {
 			slog.Error("Error running worker", "err", err)
+			taskStateChan <- taskStatusMessage{
+				Name:   *task.TaskName,
+				Status: api.ERROR,
+			}
+			continue
 		}
 
 		agentStateChan <- agentStatusIdle
@@ -409,11 +429,21 @@ func (a *Agent) startHeartbeat(ctx context.Context) error {
 func (a *Agent) updateTaskStatus(ctx context.Context, taskName string, status api.TaskStatus) error {
 	slog.Info("Updating task status", "task_name", taskName, "status", status)
 
-	_, err := a.APIClient.UpdateTask(ctx, taskName, api.UpdateTaskInput{
+	response, err := a.APIClient.UpdateTask(ctx, taskName, api.UpdateTaskInput{
 		Status: &status,
 	})
+	if err != nil {
+		slog.Error("Error updating task status", "err", err)
+		return err
+	}
 
-	return err
+	if response.StatusCode != 200 {
+		slog.Error("Received non-200 response from API when updating task status", "err", response.StatusCode)
+		return fmt.Errorf("error updating task status: %v", response.Status)
+	}
+
+	slog.Info("Task status updated", "task_name", taskName, "status", status)
+	return nil
 }
 
 func (a *Agent) setCurrentTask(taskName string, status api.TaskStatus) {

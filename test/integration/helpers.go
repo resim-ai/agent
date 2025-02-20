@@ -463,6 +463,7 @@ func (s *AgentTestSuite) createAndAwaitBatch(buildID uuid.UUID, experiences []uu
 
 	batch := *createBatchResponse.JSON201
 
+	s.T().Logf("Batch created, with ID: %v", *batch.BatchID)
 	s.Eventually(func() bool {
 		getResponse, err := s.APIClient.GetBatchWithResponse(
 			context.Background(),
