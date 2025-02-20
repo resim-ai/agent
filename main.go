@@ -162,7 +162,9 @@ func (a *Agent) Start() error {
 		}
 
 		slog.Info("Got new task", "task_name", *task.TaskName)
-
+		// Set the current task with the agent and update the task status to
+		// SUBMITTED.
+		a.setCurrentTask(*task.TaskName, api.SUBMITTED)
 		taskStateChan <- taskStatusMessage{
 			Name:   *task.TaskName,
 			Status: api.SUBMITTED,
@@ -178,6 +180,7 @@ func (a *Agent) Start() error {
 				Name:   *task.TaskName,
 				Status: api.ERROR,
 			}
+			a.setCurrentTask("", "")
 			continue
 		}
 
@@ -189,6 +192,7 @@ func (a *Agent) Start() error {
 				Name:   *task.TaskName,
 				Status: api.ERROR,
 			}
+			a.setCurrentTask("", "")
 			continue
 		}
 
@@ -253,6 +257,7 @@ func (a *Agent) getTask() api.TaskPollOutput {
 		return api.TaskPollOutput{}
 	case 200:
 		task := pollResponse.JSON200
+		slog.Info("Received task", "task-name", *task.TaskName)
 		return *task
 	default:
 		slog.Error("error polling for task", "err", pollResponse.StatusCode())
@@ -363,6 +368,7 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 	for {
 		status, err := a.Docker.ContainerInspect(ctx, res.ID)
 		if err != nil {
+			a.setCurrentTask("", "")
 			return err
 		}
 		if status.State.Status != "running" {
@@ -447,6 +453,7 @@ func (a *Agent) updateTaskStatus(ctx context.Context, taskName string, status ap
 }
 
 func (a *Agent) setCurrentTask(taskName string, status api.TaskStatus) {
+	slog.Info("Setting current task", "task_name", taskName, "status", status)
 	a.CurrentTaskName = taskName
 	a.CurrentTaskStatus = status
 }
