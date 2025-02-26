@@ -19,6 +19,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pkg/errors"
 	"github.com/resim-ai/agent/api"
 	"github.com/spf13/viper"
 	"golang.org/x/oauth2"
@@ -184,7 +185,7 @@ func (a *Agent) Start() error {
 		}
 
 		// Attempt to run the worker; if this fails, we need to error the task.
-		err = a.runWorker(ctx, Task(task), taskStateChan)
+		err = a.runWorker(ctx, Task(task))
 		if err != nil {
 			slog.Error("Error running worker", "err", err)
 			taskStateChan <- taskStatusMessage{
@@ -274,7 +275,7 @@ func StringifyEnvironmentVariables(inputVars [][]string) []string {
 	return envVars
 }
 
-func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan taskStatusMessage) error {
+func (a *Agent) runWorker(ctx context.Context, task Task) error {
 	providedEnvVars := StringifyEnvironmentVariables(*task.WorkerEnvironmentVariables)
 	extraEnvVars := []string{
 		"RERUN_WORKER_ENVIRONMENT=dev",
@@ -352,38 +353,27 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 		*task.TaskName,
 	)
 	if err != nil {
-		fmt.Println(err)
+		return errors.Wrapf(err, "error creating container for task %s", *task.TaskName)
 	}
 
 	err = a.Docker.ContainerStart(ctx, res.ID, container.StartOptions{})
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "error starting container for task %s", *task.TaskName)
 	}
 	slog.Info("Container for task starting", "task", *task.TaskName)
-	taskStateChan <- taskStatusMessage{
-		Name:   *task.TaskName,
-		Status: api.RUNNING,
-	}
+	// From now one, the worker is responsible for updating its own status.
 	a.setCurrentTask(*task.TaskName, api.RUNNING)
 	for {
 		status, err := a.Docker.ContainerInspect(ctx, res.ID)
 		if err != nil {
 			a.setCurrentTask("", "")
-			return err
+			return errors.Wrapf(err, "error inspecting container for task %s", *task.TaskName)
 		}
 		if status.State.Status != "running" {
 			if status.State.ExitCode == 0 {
 				slog.Info("Container for task succeeded", "task", *task.TaskName)
-				taskStateChan <- taskStatusMessage{
-					Name:   *task.TaskName,
-					Status: api.SUCCEEDED,
-				}
 			} else {
 				slog.Info("Container exited non-zero", "task", *task.TaskName, "exit_code", status.State.ExitCode, "err", status.State.Error)
-				taskStateChan <- taskStatusMessage{
-					Name:   *task.TaskName,
-					Status: api.ERROR,
-				}
 			}
 			a.setCurrentTask("", "")
 			break
