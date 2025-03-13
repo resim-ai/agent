@@ -96,6 +96,9 @@ func ListExpectedOutputFiles(realMetrics bool) []string {
 		ExpectedExperienceNameFile,
 		ExpectedExperienceNameBase64File,
 		"test_config.json",
+		"error.txt",
+		"test.rrd",
+		"emissions.ndjson",
 	}
 
 	if realMetrics {
