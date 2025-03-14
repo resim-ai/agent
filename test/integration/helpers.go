@@ -37,6 +37,9 @@ const (
 	// Output File Names
 	TestMCAPFile string = "test.mcap"
 	TestMP4File  string = "test.mp4"
+	TestErrorFile string = "error.txt"
+	TestReRunFile string =  "test.rrd"
+	TestEmissionsFile string ="emissions.ndjson"
 
 	apiCheckTimeout  = 10 * time.Minute
 	apiCheckInterval = 10 * time.Second
@@ -96,9 +99,9 @@ func ListExpectedOutputFiles(realMetrics bool) []string {
 		ExpectedExperienceNameFile,
 		ExpectedExperienceNameBase64File,
 		"test_config.json",
-		"error.txt",
-		"test.rrd",
-		"emissions.ndjson",
+		TestErrorFile,
+		TestReRunFile,
+		TestEmissionsFile,
 	}
 
 	if realMetrics {
@@ -110,6 +113,9 @@ func ListExpectedOutputFiles(realMetrics bool) []string {
 			fmt.Sprintf("metrics-%v", ExpectedExperienceNameBase64File),
 			"test_config.json",
 			"test_file.txt", // from an external file metric
+			fmt.Sprintf("metrics-%v", TestErrorFile),
+			fmt.Sprintf("metrics-%v", TestReRunFile),
+			fmt.Sprintf("metrics-%v", TestEmissionsFile),
 		}...)
 	}
 
