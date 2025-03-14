@@ -4,7 +4,7 @@
 
 Changes and release notes for the ReSim agent
 
-## v0.3.0 - 2025-02-20
+## v0.3.0 - 2025-03-14
 
 - Added support for experience-specific container timeouts
 
