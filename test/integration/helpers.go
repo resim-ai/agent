@@ -35,11 +35,11 @@ const (
 	metricsBuildURI    string = "909785973729.dkr.ecr.us-east-1.amazonaws.com/rerun-end-to-end-test-metrics-build:latest"
 
 	// Output File Names
-	TestMCAPFile string = "test.mcap"
-	TestMP4File  string = "test.mp4"
-	TestErrorFile string = "error.txt"
-	TestReRunFile string =  "test.rrd"
-	TestEmissionsFile string ="emissions.ndjson"
+	TestMCAPFile      string = "test.mcap"
+	TestMP4File       string = "test.mp4"
+	TestErrorFile     string = "error.txt"
+	TestReRunFile     string = "test.rrd"
+	TestEmissionsFile string = "emissions.ndjson"
 
 	apiCheckTimeout  = 10 * time.Minute
 	apiCheckInterval = 10 * time.Second
