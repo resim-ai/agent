@@ -209,6 +209,7 @@ jobs:
               name: 'Agent Integration Test',
               head_sha: '${{ inputs.ref_name }}',
               status: 'in_progress',
+              details_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
             })
             return response.data.id
 
