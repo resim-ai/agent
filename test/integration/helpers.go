@@ -35,8 +35,11 @@ const (
 	metricsBuildURI    string = "909785973729.dkr.ecr.us-east-1.amazonaws.com/rerun-end-to-end-test-metrics-build:latest"
 
 	// Output File Names
-	TestMCAPFile string = "test.mcap"
-	TestMP4File  string = "test.mp4"
+	TestMCAPFile      string = "test.mcap"
+	TestMP4File       string = "test.mp4"
+	TestErrorFile     string = "error.txt"
+	TestReRunFile     string = "test.rrd"
+	TestEmissionsFile string = "emissions.ndjson"
 
 	apiCheckTimeout  = 10 * time.Minute
 	apiCheckInterval = 10 * time.Second
@@ -96,7 +99,9 @@ func ListExpectedOutputFiles(realMetrics bool) []string {
 		ExpectedExperienceNameFile,
 		ExpectedExperienceNameBase64File,
 		"test_config.json",
-		"test.rrd",
+		TestErrorFile,
+		TestReRunFile,
+		TestEmissionsFile,
 	}
 
 	if realMetrics {
@@ -108,7 +113,9 @@ func ListExpectedOutputFiles(realMetrics bool) []string {
 			fmt.Sprintf("metrics-%v", ExpectedExperienceNameBase64File),
 			"test_config.json",
 			"test_file.txt", // from an external file metric
-			"metrics-test.rrd",
+			fmt.Sprintf("metrics-%v", TestErrorFile),
+			fmt.Sprintf("metrics-%v", TestReRunFile),
+			fmt.Sprintf("metrics-%v", TestEmissionsFile),
 		}...)
 	}
 
