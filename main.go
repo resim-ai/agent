@@ -41,24 +41,25 @@ type taskStatusMessage struct {
 }
 
 type Agent struct {
-	APIClient         *api.ClientWithResponses
-	Docker            DockerClient
-	CurrentToken      *oauth2.Token
-	TokenMutex        sync.Mutex
-	ClientID          string
-	AuthHost          string
-	APIHost           string
-	Name              string
-	PoolLabels        []string
-	ConfigDirOverride string
-	LogDirOverride    string
-	LogLevel          string
-	Status            agentStatus
-	CurrentTaskName   string
-	CurrentTaskStatus api.TaskStatus
-	AutoUpdate        bool
-	Privileged        bool
-	DockerNetworkMode DockerNetworkMode
+	APIClient               *api.ClientWithResponses
+	Docker                  DockerClient
+	CurrentToken            *oauth2.Token
+	TokenMutex              sync.Mutex
+	ClientID                string
+	AuthHost                string
+	APIHost                 string
+	Name                    string
+	PoolLabels              []string
+	ConfigDirOverride       string
+	LogDirOverride          string
+	LogLevel                string
+	Status                  agentStatus
+	CurrentTaskName         string
+	CurrentTaskStatus       api.TaskStatus
+	AutoUpdate              bool
+	Privileged              bool
+	DockerNetworkMode       DockerNetworkMode
+	CustomerContainerAWSDir string
 }
 
 type Task api.TaskPollOutput
@@ -258,6 +259,10 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 	}
 	if a.Privileged {
 		extraEnvVars = append(extraEnvVars, "RERUN_WORKER_PRIVILEGED=true")
+	}
+
+	if a.CustomerContainerAWSDir != "" {
+		extraEnvVars = append(extraEnvVars, fmt.Sprintf("RERUN_WORKER_CUSTOMER_CONTAINER_AWS_DIR=%v", a.CustomerContainerAWSDir))
 	}
 
 	var homeDir string

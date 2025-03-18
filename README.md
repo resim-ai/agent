@@ -44,6 +44,9 @@ auto-update: false
 privileged: false
 # Docker network (default: bridge) - if "host", your jobs will be run without network isolation (equivalent to docker run --net=host)
 docker-network-mode: bridge
+# AWS config directory destination - if provided, the ~/.aws directory of the user running the agent will be mounted at this path in your test container
+# The value should be the expected AWS config directory of the user that runs in your test container 
+aws-destination-dir: /home/ubuntu/.aws (for example)
 ```
 
 Note that the `pool-labels` are an OR/ANY selection, that is, an agent running with the labels `big` and `small` will run jobs tagged with either of those labels.
