@@ -4,6 +4,10 @@
 
 Changes and release notes for the ReSim agent
 
+## v0.3.0 - 2025-03-19
+
+- Added `aws-config-destination-dir` and `aws-config-source-dir` options to support mounting AWS config and credentials from the user running the agent (or another location) into the test container
+
 ## v0.2.6 - 2025-01-21
 
 - Fixes missing parameter in integration test
@@ -14,7 +18,7 @@ Changes and release notes for the ReSim agent
 
 ## v0.2.4 - 2024-11-21
 
-- Added docker-network-mode to enable running test workloads with either bridge (default) or host networking mode
+- Added `docker-network-mode` to enable running test workloads with either bridge (default) or host networking mode
 
 ## v0.2.3 - 2024-11-18
 
