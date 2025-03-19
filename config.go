@@ -22,27 +22,28 @@ const (
 )
 
 const (
-	APIHostDefault             = "https://agentapi.resim.ai/agent/v1"
-	APIHostKey                 = "api-host"
-	AuthHostDefault            = "https://resim.us.auth0.com"
-	AuthHostKey                = "auth-host"
-	PoolLabelsKey              = "pool-labels"
-	OneTaskKey                 = "one-task"
-	UsernameKey                = "username"
-	PasswordKey                = "password"
-	AgentNameKey               = "name"
-	EnvPrefix                  = "RESIM_AGENT"
-	LogLevelKey                = "log-level"
-	LogFilesizeKey             = "log-max-filesize"
-	LogFilesizeDefault         = 500
-	AutoUpdateKey              = "auto-update"
-	PrivilegedKey              = "privileged"
-	PrivilegedDefault          = false
-	NetworkModeKey             = "docker-network-mode"
-	NetworkModeDefault         = string(DockerNetworkModeBridge)
-	ConfigPath                 = "$HOME/resim"
-	CredentialCacheFilename    = "cache.json"
-	CustomerContainerAWSDirKey = "aws-destination-dir"
+	APIHostDefault                   = "https://agentapi.resim.ai/agent/v1"
+	APIHostKey                       = "api-host"
+	AuthHostDefault                  = "https://resim.us.auth0.com"
+	AuthHostKey                      = "auth-host"
+	PoolLabelsKey                    = "pool-labels"
+	OneTaskKey                       = "one-task"
+	UsernameKey                      = "username"
+	PasswordKey                      = "password"
+	AgentNameKey                     = "name"
+	EnvPrefix                        = "RESIM_AGENT"
+	LogLevelKey                      = "log-level"
+	LogFilesizeKey                   = "log-max-filesize"
+	LogFilesizeDefault               = 500
+	AutoUpdateKey                    = "auto-update"
+	PrivilegedKey                    = "privileged"
+	PrivilegedDefault                = false
+	NetworkModeKey                   = "docker-network-mode"
+	NetworkModeDefault               = string(DockerNetworkModeBridge)
+	ConfigPath                       = "$HOME/resim"
+	CredentialCacheFilename          = "cache.json"
+	CustomerContainerAWSDestDirKey   = "aws-config-destination-dir"
+	CustomerContainerAWSSourceDirKey = "aws-config-source-dir"
 )
 
 func parseNetworkMode(mode string) (DockerNetworkMode, error) {
@@ -112,8 +113,11 @@ func (a *Agent) LoadConfig() error {
 	}
 	a.PoolLabels = viper.GetStringSlice(PoolLabelsKey)
 
-	viper.SetDefault(CustomerContainerAWSDirKey, "")
-	a.CustomerContainerAWSDir = viper.GetString(CustomerContainerAWSDirKey)
+	viper.SetDefault(CustomerContainerAWSDestDirKey, "")
+	a.CustomerContainerAWSDestDir = viper.GetString(CustomerContainerAWSDestDirKey)
+
+	viper.SetDefault(CustomerContainerAWSSourceDirKey, "")
+	a.CustomerContainerAWSSourceDir = viper.GetString(CustomerContainerAWSSourceDirKey)
 
 	slog.Info("loaded config",
 		"apiHost", a.APIHost,
@@ -122,7 +126,8 @@ func (a *Agent) LoadConfig() error {
 		"poolLabels", a.PoolLabels,
 		"privileged", a.Privileged,
 		"dockerNetworkMode", a.DockerNetworkMode,
-		"customerContainerAWSDir", a.CustomerContainerAWSDir,
+		"customerContainerAWSDestDir", a.CustomerContainerAWSDestDir,
+		"customerContainerAWSSourceDir", a.CustomerContainerAWSSourceDir,
 		"one_task", viper.GetBool(OneTaskKey),
 	)
 

@@ -6,7 +6,7 @@ Changes and release notes for the ReSim agent
 
 ## v0.3.0 - 2025-03-19
 
-- Added `aws-destination-dir` option to support mounting AWS config and credentials from the user running the agent into the test container
+- Added `aws-config-destination-dir` and `aws-config-source-dir` options to support mounting AWS config and credentials from the user running the agent (or another location) into the test container
 
 ## v0.2.6 - 2025-01-21
 
