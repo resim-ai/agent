@@ -4,6 +4,10 @@
 
 Changes and release notes for the ReSim agent
 
+## v0.4.0 - 2025-03-20
+
+- Added support for experience-specific container timeouts and a few robustness fixes.
+
 ## v0.3.0 - 2025-03-19
 
 - Added `aws-config-destination-dir` and `aws-config-source-dir` options to support mounting AWS config and credentials from the user running the agent (or another location) into the test container
