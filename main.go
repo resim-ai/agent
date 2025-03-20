@@ -42,24 +42,26 @@ type taskStatusMessage struct {
 }
 
 type Agent struct {
-	APIClient         *api.ClientWithResponses
-	Docker            DockerClient
-	CurrentToken      *oauth2.Token
-	TokenMutex        sync.Mutex
-	ClientID          string
-	AuthHost          string
-	APIHost           string
-	Name              string
-	PoolLabels        []string
-	ConfigDirOverride string
-	LogDirOverride    string
-	LogLevel          string
-	Status            agentStatus
-	CurrentTaskName   string
-	CurrentTaskStatus api.TaskStatus
-	AutoUpdate        bool
-	Privileged        bool
-	DockerNetworkMode DockerNetworkMode
+	APIClient                     *api.ClientWithResponses
+	Docker                        DockerClient
+	CurrentToken                  *oauth2.Token
+	TokenMutex                    sync.Mutex
+	ClientID                      string
+	AuthHost                      string
+	APIHost                       string
+	Name                          string
+	PoolLabels                    []string
+	ConfigDirOverride             string
+	LogDirOverride                string
+	LogLevel                      string
+	Status                        agentStatus
+	CurrentTaskName               string
+	CurrentTaskStatus             api.TaskStatus
+	AutoUpdate                    bool
+	Privileged                    bool
+	DockerNetworkMode             DockerNetworkMode
+	CustomerContainerAWSDestDir   string
+	CustomerContainerAWSSourceDir string
 }
 
 type Task api.TaskPollOutput
@@ -287,6 +289,10 @@ func (a *Agent) runWorker(ctx context.Context, task Task) error {
 		extraEnvVars = append(extraEnvVars, "RERUN_WORKER_PRIVILEGED=true")
 	}
 
+	if a.CustomerContainerAWSDestDir != "" {
+		extraEnvVars = append(extraEnvVars, fmt.Sprintf("RERUN_WORKER_CUSTOMER_CONTAINER_AWS_DEST_DIR=%v", a.CustomerContainerAWSDestDir))
+	}
+
 	var homeDir string
 	user, err := user.Current()
 	if err != nil {
@@ -309,6 +315,12 @@ func (a *Agent) runWorker(ctx context.Context, task Task) error {
 	if err != nil {
 		slog.Info("AWS config directory does not exist")
 		mountAWSConfigDir = false
+	}
+
+	if a.CustomerContainerAWSSourceDir != "" {
+		extraEnvVars = append(extraEnvVars, fmt.Sprintf("RERUN_WORKER_CUSTOMER_CONTAINER_AWS_SOURCE_DIR=%v", a.CustomerContainerAWSSourceDir))
+	} else {
+		extraEnvVars = append(extraEnvVars, "RERUN_WORKER_CUSTOMER_CONTAINER_AWS_SOURCE_DIR=%v", hostAWSConfigDir)
 	}
 
 	config := &container.Config{
