@@ -6,7 +6,7 @@ Changes and release notes for the ReSim agent
 
 ## v0.4.0 - 2025-03-27
 
-- Added `mounts` and `envioronment-variables` options to support mounting arbitrary volumes and environment variables into the test container
+- Added `mounts` and `environment-variables` options to support mounting arbitrary volumes and environment variables into the test container
 
 ## v0.3.0 - 2025-03-19
 
