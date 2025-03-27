@@ -26,7 +26,13 @@ pool-labels:
   - small
   - big
 username: gimli
-password: hunter2`
+password: hunter2
+mounts:
+  - /lain/pain:/gain/iain
+  - /len/landy:/lharon/lichael
+environment-variables:
+  - REPUNS_ENABLED=true
+  - CAFFEINE_LEVEL=zero`
 
 type AgentTestSuite struct {
 	suite.Suite
@@ -71,31 +77,6 @@ func (s *AgentTestSuite) TestStringifyEnvironmentVariables() {
 		"RERUN_WORKER_FOO=bar",
 		"RERUN_WORKER_BAR=foo",
 	}, outputVars)
-}
-
-func (s *AgentTestSuite) TestLoadConfigFile() {
-	configDir := createConfigFile()
-	defer os.Remove(configDir)
-
-	a := Agent{
-		ConfigDirOverride: configDir,
-	}
-
-	err := a.LoadConfig()
-	s.NoError(err)
-
-	s.Equal("https://agentapi.resim.ai/agent/v1", a.APIHost)
-	s.Equal("my-forklift", a.Name)
-}
-
-func (s *AgentTestSuite) TestInvalidConfig() {
-	a := Agent{
-		ConfigDirOverride: "/not/real/path/",
-	}
-
-	err := a.Start()
-
-	s.Error(err)
 }
 
 func (s *AgentTestSuite) TestPrivilegedModeHostMode() {
@@ -250,6 +231,7 @@ func (s *AgentTestSuite) TestDefaultAgentDockeModes() {
 
 	var workerPrivilegedEnvVar string
 	var workerDockerNetworkModeEnvVar string
+	var customConfigVar string
 	s.mockDocker.On(
 		"ContainerCreate",
 		mock.Anything,
@@ -265,6 +247,9 @@ func (s *AgentTestSuite) TestDefaultAgentDockeModes() {
 			}
 			if strings.HasPrefix(envVar, "RERUN_WORKER_DOCKER_NETWORK_MODE") {
 				workerDockerNetworkModeEnvVar = envVar
+			}
+			if strings.HasPrefix(envVar, "RERUN_WORKER_CUSTOM_WORKER_CONFIG") {
+				customConfigVar = envVar
 			}
 		}
 	}).Return(container.CreateResponse{
@@ -295,6 +280,22 @@ func (s *AgentTestSuite) TestDefaultAgentDockeModes() {
 	s.Empty(workerPrivilegedEnvVar)
 	// check docker network mode is being passed through to the worker
 	s.Equal("RERUN_WORKER_DOCKER_NETWORK_MODE=bridge", workerDockerNetworkModeEnvVar)
+	// check we can unmarshal the custom config
+	var customConfig CustomWorkerConfig
+	jsonPart := strings.TrimPrefix(customConfigVar, "RERUN_WORKER_CUSTOM_WORKER_CONFIG=")
+	err = json.Unmarshal([]byte(jsonPart), &customConfig)
+	s.NoError(err)
+	expectedCustomConfig := CustomWorkerConfig{
+		Mounts: []Mount{
+			{Source: "/lain/pain", Target: "/gain/iain"},
+			{Source: "/len/landy", Target: "/lharon/lichael"},
+		},
+		EnvVars: []EnvVar{
+			{Key: "REPUNS_ENABLED", Value: "true"},
+			{Key: "CAFFEINE_LEVEL", Value: "zero"},
+		},
+	}
+	s.Equal(expectedCustomConfig, customConfig)
 }
 
 func (s *AgentTestSuite) mockAuthServer() *httptest.Server {

@@ -51,7 +51,7 @@ const (
 
 type CustomWorkerConfig struct {
 	Mounts  []Mount  `json:"mounts"`
-	EnvVars []EnvVar `json:"env_vars"`
+	EnvVars []EnvVar `json:"envvars"`
 }
 
 type Mount struct {
