@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,8 +17,8 @@ type ConfigTestSuite struct {
 	tempConfigDir string
 }
 
-func TestConfigSuite(t *testing.T) {
-	suite.Run(t, new(ConfigTestSuite))
+func TestConfigSuite(s *testing.T) {
+	suite.Run(s, new(ConfigTestSuite))
 }
 
 func (s *ConfigTestSuite) SetupTest() {
@@ -25,13 +26,13 @@ func (s *ConfigTestSuite) SetupTest() {
 
 	tempDir, err := os.MkdirTemp("", "test-config-*")
 	if err != nil {
-		s.T().Fatalf("Failed to create temp dir: %v", err)
+		log.Fatalf("Failed to create temp dir: %v", err)
 	}
 
 	s.tempConfigDir = filepath.Join(tempDir, "resim")
 	err = os.MkdirAll(s.tempConfigDir, 0700)
 	if err != nil {
-		s.T().Fatalf("Failed to create temp config dir: %v", err)
+		log.Fatalf("Failed to create temp config dir: %v", err)
 	}
 	s.agent.ConfigDirOverride = s.tempConfigDir
 }
@@ -45,7 +46,7 @@ func (s *ConfigTestSuite) createConfigFile(content string) {
 	configFile := filepath.Join(s.tempConfigDir, "config.yaml")
 	err := os.WriteFile(configFile, []byte(content), 0600)
 	if err != nil {
-		s.T().Fatalf("Failed to write config file: %v", err)
+		log.Fatalf("Failed to write config file: %v", err)
 	}
 }
 
