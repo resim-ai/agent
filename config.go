@@ -178,24 +178,22 @@ func (a *Agent) LoadConfig() error {
 		hostAWSConfigDir, configDirExists = GetHostAWSConfigDir()
 	}
 
-	viper.SetDefault(CustomerContainerAWSDestDirKey, "")
-	viper.SetDefault(CustomerContainerAWSSourceDirKey, "")
-	// if there is no override source dir: set it:
-	if viper.GetString(CustomerContainerAWSSourceDirKey) == "" {
-		if configDirExists {
-			a.CustomerContainerAWSSourceDir = hostAWSConfigDir
-		} else {
-			slog.Warn("No AWS config dir found on host; will not mount AWS config dir for worker or container")
-		}
+	if configDirExists {
+		a.HostAWSConfigDir = hostAWSConfigDir
+		a.HostAWSConfigExists = true
 	} else {
-		a.CustomerContainerAWSSourceDir = viper.GetString(CustomerContainerAWSSourceDirKey)
+		a.HostAWSConfigExists = false
+		slog.Warn("No AWS config dir found on host; will not mount AWS config dir for worker or container")
 	}
 
-	// Finally, if there is also a destination dir: add it to the mounts:
-	if viper.GetString(CustomerContainerAWSDestDirKey) != "" && a.CustomerContainerAWSSourceDir != "" {
+	viper.SetDefault(CustomerContainerAWSDestDirKey, "")
+	viper.SetDefault(CustomerContainerAWSSourceDirKey, hostAWSConfigDir)
+
+	// Finally, if there is also a destination dir: add it to the mounts with the source dir::
+	if viper.GetString(CustomerContainerAWSDestDirKey) != "" && viper.GetString(CustomerContainerAWSSourceDirKey) != "" {
 		a.CustomerWorkerConfig.Mounts = append(a.CustomerWorkerConfig.Mounts,
 			Mount{
-				Source: a.CustomerContainerAWSSourceDir,
+				Source: viper.GetString(CustomerContainerAWSSourceDirKey),
 				Target: viper.GetString(CustomerContainerAWSDestDirKey),
 			},
 		)

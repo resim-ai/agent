@@ -147,7 +147,8 @@ aws-config-destination-dir: /container/aws
 	s.NoError(err)
 
 	// Check that the AWS directory was detected and added to mounts
-	s.Equal(awsDir, s.agent.CustomerContainerAWSSourceDir)
+	s.Equal(awsDir, s.agent.HostAWSConfigDir)
+	s.True(s.agent.HostAWSConfigExists)
 	found := false
 	for _, mount := range s.agent.CustomerWorkerConfig.Mounts {
 		if mount.Source == awsDir && mount.Target == "/container/aws" {
@@ -156,6 +157,31 @@ aws-config-destination-dir: /container/aws
 		}
 	}
 	s.True(found, "AWS directory mount not found")
+}
+
+func (s *ConfigTestSuite) TestLoadConfigNoAWSDirectory() {
+
+	// "Dependency Injection a la Golang"
+	s.agent.getAWSConfigDirFunc = func() (string, bool) {
+		return "", false
+	}
+
+	s.createConfigFile(`
+api-host: https://test-api.resim.ai/agent/v1
+auth-host: https://test.us.auth0.com
+name: test-agent
+pool-labels:
+  - small
+aws-config-destination-dir: /container/aws
+`)
+
+	err := s.agent.LoadConfig()
+	s.NoError(err)
+
+	// Check that the AWS directory was detected and added to mounts
+	s.Empty(s.agent.HostAWSConfigDir)
+	s.False(s.agent.HostAWSConfigExists)
+	s.Len(s.agent.CustomerWorkerConfig.Mounts, 0)
 }
 
 func (s *ConfigTestSuite) TestLoadConfigAWSSourceOverride() {
@@ -188,7 +214,8 @@ aws-config-destination-dir: /container/aws
 	s.NoError(err)
 
 	// Check that the custom AWS directory was used
-	s.Equal(customAwsDir, s.agent.CustomerContainerAWSSourceDir)
+	s.Equal(defaultAwsDir, s.agent.HostAWSConfigDir)
+	s.True(s.agent.HostAWSConfigExists)
 	found := false
 	for _, mount := range s.agent.CustomerWorkerConfig.Mounts {
 		if mount.Source == customAwsDir && mount.Target == "/container/aws" {

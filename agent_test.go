@@ -27,6 +27,8 @@ pool-labels:
   - big
 username: gimli
 password: hunter2
+aws-config-destination-dir: /container/aws
+aws-config-source-dir: /foo/aws
 mounts:
   - /lain/pain:/gain/iain
   - /len/landy:/lharon/lichael
@@ -289,6 +291,7 @@ func (s *AgentTestSuite) TestDefaultAgentDockeModes() {
 		Mounts: []Mount{
 			{Source: "/lain/pain", Target: "/gain/iain"},
 			{Source: "/len/landy", Target: "/lharon/lichael"},
+			{Source: "/foo/aws", Target: "/container/aws"},
 		},
 		EnvVars: []EnvVar{
 			{Key: "REPUNS_ENABLED", Value: "true"},

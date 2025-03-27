@@ -42,26 +42,27 @@ type taskStatusMessage struct {
 }
 
 type Agent struct {
-	APIClient                     *api.ClientWithResponses
-	Docker                        DockerClient
-	CurrentToken                  *oauth2.Token
-	TokenMutex                    sync.Mutex
-	ClientID                      string
-	AuthHost                      string
-	APIHost                       string
-	Name                          string
-	PoolLabels                    []string
-	ConfigDirOverride             string
-	LogDirOverride                string
-	LogLevel                      string
-	Status                        agentStatus
-	CurrentTaskName               string
-	CurrentTaskStatus             api.TaskStatus
-	AutoUpdate                    bool
-	Privileged                    bool
-	DockerNetworkMode             DockerNetworkMode
-	CustomerContainerAWSSourceDir string
-	CustomerWorkerConfig          CustomWorkerConfig
+	APIClient            *api.ClientWithResponses
+	Docker               DockerClient
+	CurrentToken         *oauth2.Token
+	TokenMutex           sync.Mutex
+	ClientID             string
+	AuthHost             string
+	APIHost              string
+	Name                 string
+	PoolLabels           []string
+	ConfigDirOverride    string
+	LogDirOverride       string
+	LogLevel             string
+	Status               agentStatus
+	CurrentTaskName      string
+	CurrentTaskStatus    api.TaskStatus
+	AutoUpdate           bool
+	Privileged           bool
+	DockerNetworkMode    DockerNetworkMode
+	HostAWSConfigDir     string
+	HostAWSConfigExists  bool
+	CustomerWorkerConfig CustomWorkerConfig
 	// For testing purposes - allows mocking the AWS config directory lookup
 	getAWSConfigDirFunc func() (string, bool)
 }
@@ -314,10 +315,10 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 		},
 	}
 
-	if a.CustomerContainerAWSSourceDir != "" {
+	if a.HostAWSConfigExists {
 		hostConfig.Mounts = append(hostConfig.Mounts, mount.Mount{
 			Type:   mount.TypeBind,
-			Source: a.CustomerContainerAWSSourceDir,
+			Source: a.HostAWSConfigDir,
 			Target: "/root/.aws",
 		})
 	}
