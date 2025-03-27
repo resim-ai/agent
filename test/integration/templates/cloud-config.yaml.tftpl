@@ -34,6 +34,11 @@ write_files:
         - ${pool_labels}
       username: ${agent_username}
       password: ${agent_password}
+      environment-variables:
+        - THIS_IS_A=test
+        - AGENT=true
+      mounts:
+        - /resim:/tmp/agent/resim
   - path: /resim/docker/config.yaml
     owner: root:root
     permissions: '0644'
@@ -45,7 +50,11 @@ write_files:
         - ${pool_labels}-docker
       username: ${agent_username}
       password: ${agent_password}
-
+      environment-variables:
+        - THIS_IS_A=test
+        - AGENT=true
+      mounts:
+        - /resim:/tmp/agent/resim
 runcmd:
   - wget https://s3.amazonaws.com/amazoncloudwatch-agent/debian/amd64/latest/amazon-cloudwatch-agent.deb
   - dpkg -i -E ./amazon-cloudwatch-agent.deb

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -41,26 +42,29 @@ type taskStatusMessage struct {
 }
 
 type Agent struct {
-	APIClient                     *api.ClientWithResponses
-	Docker                        DockerClient
-	CurrentToken                  *oauth2.Token
-	TokenMutex                    sync.Mutex
-	ClientID                      string
-	AuthHost                      string
-	APIHost                       string
-	Name                          string
-	PoolLabels                    []string
-	ConfigDirOverride             string
-	LogDirOverride                string
-	LogLevel                      string
-	Status                        agentStatus
-	CurrentTaskName               string
-	CurrentTaskStatus             api.TaskStatus
-	AutoUpdate                    bool
-	Privileged                    bool
-	DockerNetworkMode             DockerNetworkMode
-	CustomerContainerAWSDestDir   string
-	CustomerContainerAWSSourceDir string
+	APIClient            *api.ClientWithResponses
+	Docker               DockerClient
+	CurrentToken         *oauth2.Token
+	TokenMutex           sync.Mutex
+	ClientID             string
+	AuthHost             string
+	APIHost              string
+	Name                 string
+	PoolLabels           []string
+	ConfigDirOverride    string
+	LogDirOverride       string
+	LogLevel             string
+	Status               agentStatus
+	CurrentTaskName      string
+	CurrentTaskStatus    api.TaskStatus
+	AutoUpdate           bool
+	Privileged           bool
+	DockerNetworkMode    DockerNetworkMode
+	HostAWSConfigDir     string
+	HostAWSConfigExists  bool
+	CustomerWorkerConfig CustomWorkerConfig
+	// For testing purposes - allows mocking the AWS config directory lookup
+	getAWSConfigDirFunc func() (string, bool)
 }
 
 type Task api.TaskPollOutput
@@ -262,9 +266,14 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 		extraEnvVars = append(extraEnvVars, "RERUN_WORKER_PRIVILEGED=true")
 	}
 
-	if a.CustomerContainerAWSDestDir != "" {
-		extraEnvVars = append(extraEnvVars, fmt.Sprintf("RERUN_WORKER_CUSTOMER_CONTAINER_AWS_DEST_DIR=%v", a.CustomerContainerAWSDestDir))
+	// convert the custom worker config to json string:
+	customWorkerConfigJSON, err := json.Marshal(a.CustomerWorkerConfig)
+	if err != nil {
+		slog.Error("Error marshalling custom worker config", "err", err)
+		return err
 	}
+	slog.Info("Custom worker config", "config", string(customWorkerConfigJSON))
+	extraEnvVars = append(extraEnvVars, "RERUN_WORKER_CUSTOM_WORKER_CONFIG="+string(customWorkerConfigJSON))
 
 	var homeDir string
 	user, err := user.Current()
@@ -279,21 +288,6 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 	_, err = os.Stat(hostDockerConfigDir)
 	if err != nil {
 		slog.Info("Docker config directory does not exist")
-	}
-
-	hostAWSConfigDir, _ := filepath.Abs(filepath.Join(homeDir, ".aws"))
-	// check that this exists:
-	mountAWSConfigDir := true
-	_, err = os.Stat(hostAWSConfigDir)
-	if err != nil {
-		slog.Info("AWS config directory does not exist")
-		mountAWSConfigDir = false
-	}
-
-	if a.CustomerContainerAWSSourceDir != "" {
-		extraEnvVars = append(extraEnvVars, fmt.Sprintf("RERUN_WORKER_CUSTOMER_CONTAINER_AWS_SOURCE_DIR=%v", a.CustomerContainerAWSSourceDir))
-	} else {
-		extraEnvVars = append(extraEnvVars, "RERUN_WORKER_CUSTOMER_CONTAINER_AWS_SOURCE_DIR=%v", hostAWSConfigDir)
 	}
 
 	config := &container.Config{
@@ -321,10 +315,10 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 		},
 	}
 
-	if mountAWSConfigDir {
+	if a.HostAWSConfigExists {
 		hostConfig.Mounts = append(hostConfig.Mounts, mount.Mount{
 			Type:   mount.TypeBind,
-			Source: hostAWSConfigDir,
+			Source: a.HostAWSConfigDir,
 			Target: "/root/.aws",
 		})
 	}

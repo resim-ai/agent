@@ -7,6 +7,7 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strings"
 
@@ -44,7 +45,24 @@ const (
 	CredentialCacheFilename          = "cache.json"
 	CustomerContainerAWSDestDirKey   = "aws-config-destination-dir"
 	CustomerContainerAWSSourceDirKey = "aws-config-source-dir"
+	VolumeMountsKey                  = "mounts"
+	EnvVarsKey                       = "environment-variables"
 )
+
+type CustomWorkerConfig struct {
+	Mounts  []Mount  `json:"mounts"`
+	EnvVars []EnvVar `json:"envvars"`
+}
+
+type Mount struct {
+	Source string `json:"source"`
+	Target string `json:"target"`
+}
+
+type EnvVar struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
 
 func parseNetworkMode(mode string) (DockerNetworkMode, error) {
 	switch DockerNetworkMode(mode) {
@@ -53,6 +71,29 @@ func parseNetworkMode(mode string) (DockerNetworkMode, error) {
 	default:
 		return DockerNetworkModeBridge, errors.New("invalid network mode")
 	}
+}
+
+// GetHostAWSConfigDir returns the absolute path to an expected host AWS config dir
+// and a boolean indicating whether it exists
+func GetHostAWSConfigDir() (string, bool) {
+	var homeDir string
+	user, err := user.Current()
+	if err != nil {
+		slog.Warn("Couldn't lookup user; assuming root", "error", err)
+		homeDir = "/root"
+	} else {
+		homeDir = user.HomeDir
+	}
+	// Now parse the deprecated aws config dirs into the customer worker config mounts:
+	hostAWSConfigDir, _ := filepath.Abs(filepath.Join(homeDir, ".aws"))
+	// check that this exists:
+	configDirExists := true
+	_, err = os.Stat(hostAWSConfigDir)
+	if err != nil {
+		slog.Info("AWS config directory does not exist")
+		configDirExists = false
+	}
+	return hostAWSConfigDir, configDirExists
 }
 
 func (a *Agent) LoadConfig() error {
@@ -113,11 +154,62 @@ func (a *Agent) LoadConfig() error {
 	}
 	a.PoolLabels = viper.GetStringSlice(PoolLabelsKey)
 
-	viper.SetDefault(CustomerContainerAWSDestDirKey, "")
-	a.CustomerContainerAWSDestDir = viper.GetString(CustomerContainerAWSDestDirKey)
+	//Parse mounts
+	if viper.IsSet(VolumeMountsKey) {
+		mountsString := viper.GetStringSlice(VolumeMountsKey)
+		for _, mount := range mountsString {
+			mountParts := strings.Split(mount, ":")
+			if len(mountParts) != 2 {
+				log.Fatal("Invalid mount format: must be <source>:<target>")
+			}
+			a.CustomerWorkerConfig.Mounts = append(a.CustomerWorkerConfig.Mounts, Mount{Source: mountParts[0], Target: mountParts[1]})
+		}
+	}
 
-	viper.SetDefault(CustomerContainerAWSSourceDirKey, "")
-	a.CustomerContainerAWSSourceDir = viper.GetString(CustomerContainerAWSSourceDirKey)
+	// Look for a standard AWS config dir on the host:
+	var hostAWSConfigDir string
+	var configDirExists bool
+
+	if a.getAWSConfigDirFunc != nil {
+		// Use test override function
+		hostAWSConfigDir, configDirExists = a.getAWSConfigDirFunc()
+	} else {
+		// Use real implementation
+		hostAWSConfigDir, configDirExists = GetHostAWSConfigDir()
+	}
+
+	if configDirExists {
+		a.HostAWSConfigDir = hostAWSConfigDir
+		a.HostAWSConfigExists = true
+	} else {
+		a.HostAWSConfigExists = false
+		slog.Warn("No AWS config dir found on host; will not mount AWS config dir for worker or container")
+	}
+
+	viper.SetDefault(CustomerContainerAWSDestDirKey, "")
+	viper.SetDefault(CustomerContainerAWSSourceDirKey, hostAWSConfigDir)
+
+	// Finally, if there is also a destination dir: add it to the mounts with the source dir::
+	if viper.GetString(CustomerContainerAWSDestDirKey) != "" && viper.GetString(CustomerContainerAWSSourceDirKey) != "" {
+		a.CustomerWorkerConfig.Mounts = append(a.CustomerWorkerConfig.Mounts,
+			Mount{
+				Source: viper.GetString(CustomerContainerAWSSourceDirKey),
+				Target: viper.GetString(CustomerContainerAWSDestDirKey),
+			},
+		)
+	}
+
+	// parse env vars
+	if viper.IsSet(EnvVarsKey) {
+		envVarsString := viper.GetStringSlice(EnvVarsKey)
+		for _, envVar := range envVarsString {
+			envVarParts := strings.Split(envVar, "=")
+			if len(envVarParts) != 2 {
+				log.Fatal("Invalid environment variable format: must be <key>=<value>")
+			}
+			a.CustomerWorkerConfig.EnvVars = append(a.CustomerWorkerConfig.EnvVars, EnvVar{Key: envVarParts[0], Value: envVarParts[1]})
+		}
+	}
 
 	slog.Info("loaded config",
 		"apiHost", a.APIHost,
@@ -126,8 +218,8 @@ func (a *Agent) LoadConfig() error {
 		"poolLabels", a.PoolLabels,
 		"privileged", a.Privileged,
 		"dockerNetworkMode", a.DockerNetworkMode,
-		"customerContainerAWSDestDir", a.CustomerContainerAWSDestDir,
-		"customerContainerAWSSourceDir", a.CustomerContainerAWSSourceDir,
+		"mounts", a.CustomerWorkerConfig.Mounts,
+		"envVars", a.CustomerWorkerConfig.EnvVars,
 		"one_task", viper.GetBool(OneTaskKey),
 	)
 
