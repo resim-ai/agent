@@ -67,6 +67,31 @@ func createConfigFile() string {
 	return t
 }
 
+func (s *AgentTestSuite) TestLoadConfigFile() {
+	configDir := createConfigFile()
+	defer os.Remove(configDir)
+
+	a := Agent{
+		ConfigDirOverride: configDir,
+	}
+
+	err := a.LoadConfig()
+	s.NoError(err)
+
+	s.Equal("https://agentapi.resim.ai/agent/v1", a.APIHost)
+	s.Equal("my-forklift", a.Name)
+}
+
+func (s *AgentTestSuite) TestInvalidConfig() {
+	a := Agent{
+		ConfigDirOverride: "/not/real/path/",
+	}
+
+	err := a.Start()
+
+	s.Error(err)
+}
+
 func (s *AgentTestSuite) TestStringifyEnvironmentVariables() {
 	inputVars := [][]string{
 		{"RERUN_WORKER_FOO", "bar"},
