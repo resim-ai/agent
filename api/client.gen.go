@@ -68,6 +68,7 @@ type TaskPollInput struct {
 
 // TaskPollOutput defines model for taskPollOutput.
 type TaskPollOutput struct {
+	ContainerTimeout           string                 `json:"containerTimeout"`
 	Tags                       *[]TagPair             `json:"tags,omitempty"`
 	TaskName                   *TaskName              `json:"taskName,omitempty"`
 	WorkerEnvironmentVariables *[]EnvironmentVariable `json:"workerEnvironmentVariables,omitempty"`
