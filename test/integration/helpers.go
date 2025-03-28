@@ -37,7 +37,6 @@ const (
 	// Output File Names
 	TestMCAPFile      string = "test.mcap"
 	TestMP4File       string = "test.mp4"
-	TestErrorFile     string = "error.txt"
 	TestReRunFile     string = "test.rrd"
 	TestEmissionsFile string = "emissions.ndjson"
 
@@ -99,7 +98,6 @@ func ListExpectedOutputFiles(realMetrics bool) []string {
 		ExpectedExperienceNameFile,
 		ExpectedExperienceNameBase64File,
 		"test_config.json",
-		TestErrorFile,
 		TestReRunFile,
 		TestEmissionsFile,
 	}
@@ -113,7 +111,6 @@ func ListExpectedOutputFiles(realMetrics bool) []string {
 			fmt.Sprintf("metrics-%v", ExpectedExperienceNameBase64File),
 			"test_config.json",
 			"test_file.txt", // from an external file metric
-			fmt.Sprintf("metrics-%v", TestErrorFile),
 			fmt.Sprintf("metrics-%v", TestReRunFile),
 			fmt.Sprintf("metrics-%v", TestEmissionsFile),
 		}...)

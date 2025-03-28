@@ -4,9 +4,13 @@
 
 Changes and release notes for the ReSim agent
 
-## v0.4.0 - 2025-03-20
+## v0.5.0 - 2025-03-28
 
 - Added support for experience-specific container timeouts and a few robustness fixes.
+
+## v0.4.0 - 2025-03-27
+
+- Added `mounts` and `environment-variables` options to support mounting arbitrary volumes and environment variables into the test container
 
 ## v0.3.0 - 2025-03-19
 

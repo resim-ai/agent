@@ -52,6 +52,15 @@ aws-config-destination-dir: /home/ubuntu/.aws (for example)
 # If you would like to override that behaviour and mount a specific directory, set aws-config-source-dir
 # Note that the initialisation of the worker will still use the AWS config of the agent user, so you can use different profiles at initialisation and runtime
 aws-config-source-dir: /home/aws-configs/dev/.aws (for example)
+
+# Add any mounts that you wish to pass to your build e.g. volumes or sockets
+mounts:
+  - /tmp/foo:/tmp/foo
+
+# Add any environment variables that you wish to pass to your build
+environment-variables:
+  - NAME=value
+  - NAME2=value2
 ```
 
 Note that the `pool-labels` are an OR/ANY selection, that is, an agent running with the labels `big` and `small` will run jobs tagged with either of those labels.
