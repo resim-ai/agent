@@ -90,7 +90,7 @@ func ListExpectedOutputFiles(realMetrics bool) []string {
 	expectedOutputFiles := []string{
 		TestMCAPFile,
 		TestMP4File,
-		"metrics.binproto",
+		"resource_metrics.binproto",
 		"experience-worker.log",
 		"experience-container.log",
 		"metrics-worker.log",
