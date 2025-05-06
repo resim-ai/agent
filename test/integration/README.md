@@ -24,14 +24,18 @@ ReRun as well. In that scenario, we'll pass across the appropriate test environm
 
 You can run these tests locally with a local running copy of the agent. Follow the instructions in the [main
 README](../../README.md) on how to configure the agent. You need to set a `pool-label` to something unique for your
-agent to pick up the test tasks.
+agent to pick up the test tasks. Almost certainly you will be running this in a different environment than the
+default, so you will need to set the `api-host` and `auth-host` to the appropriate values for the environment you are
+targeting.
 
 You need to create a container image for the local experience test. Simply build the `Dockerfile` in this directory and
 tag it, passing it into the test with the environment variable below. The `agent` assumes your docker daemon either has
 the image locally or is authenticated to the appropriate registry.
 
+Note that the ReSim app actively validates the image tag, so you need to have a full registry path.
+
 You will also need to obtain the password for the `e2e.resim.ai` account by [following these
-instructions](https://github.com/resim-ai/tf-auth0#cli-users). Note, this is a private repository.
+instructions](https://github.com/resim-ai/tf-auth0#agent-users). Note, this is a private repository.
 
 Set the following environment variables:
 
@@ -48,8 +52,10 @@ AGENT_TEST_PASSWORD=<the_password_you_obtained>
 AGENT_TEST_LOCAL_IMAGE=<your_test_build_image>
 ```
 
-Then run the following, and wait:
+Then run the following in a different terminal, and wait:
 
 ```shell
 go test -v ./test/integration
 ```
+
+Note: if you are running this within the devcontainer, you will need to make sure there is a `/tmp/resim` directory on the host machine that the agent is running on and that the `.docker` directory is mounted into the container.

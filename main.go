@@ -20,12 +20,13 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pkg/errors"
 	"github.com/resim-ai/agent/api"
 	"github.com/spf13/viper"
 	"golang.org/x/oauth2"
 )
 
-const agentVersion = "v0.4.0"
+const agentVersion = "v0.5.0"
 
 type agentStatus string
 
@@ -139,7 +140,10 @@ func (a *Agent) Start() error {
 		for {
 			select {
 			case taskStatusMessage := <-taskStateChan:
-				a.updateTaskStatus(ctx, taskStatusMessage.Name, taskStatusMessage.Status)
+				err := a.updateTaskStatus(ctx, taskStatusMessage.Name, taskStatusMessage.Status)
+				if err != nil {
+					slog.Error("Error updating task status", "err", err)
+				}
 			case agentStatus := <-agentStateChan:
 				a.Status = agentStatus
 			}
@@ -164,18 +168,38 @@ func (a *Agent) Start() error {
 		}
 
 		slog.Info("Got new task", "task_name", *task.TaskName)
-
+		// Set the current task with the agent and update the task status to
+		// SUBMITTED.
+		a.setCurrentTask(*task.TaskName, api.SUBMITTED)
 		taskStateChan <- taskStatusMessage{
-			Name: *task.TaskName,
-			// TODO: set this back to STARTING
-			Status: "SUBMITTED",
+			Name:   *task.TaskName,
+			Status: api.SUBMITTED,
 		}
 		agentStateChan <- agentStatusRunning
-		a.pullImage(ctx, *task.WorkerImageURI)
 
-		err := a.runWorker(ctx, Task(task), taskStateChan)
+		// Attempt to pull the worker image; if this fails, we need to error
+		// the task.
+		err := a.pullImage(ctx, *task.WorkerImageURI)
+		if err != nil {
+			slog.Error("Error pulling image", "err", err)
+			taskStateChan <- taskStatusMessage{
+				Name:   *task.TaskName,
+				Status: api.ERROR,
+			}
+			a.setCurrentTask("", "")
+			continue
+		}
+
+		// Attempt to run the worker; if this fails, we need to error the task.
+		err = a.runWorker(ctx, Task(task))
 		if err != nil {
 			slog.Error("Error running worker", "err", err)
+			taskStateChan <- taskStatusMessage{
+				Name:   *task.TaskName,
+				Status: api.ERROR,
+			}
+			a.setCurrentTask("", "")
+			continue
 		}
 
 		agentStateChan <- agentStatusIdle
@@ -239,6 +263,7 @@ func (a *Agent) getTask() api.TaskPollOutput {
 		return api.TaskPollOutput{}
 	case 200:
 		task := pollResponse.JSON200
+		slog.Info("Received task", "task-name", *task.TaskName)
 		return *task
 	default:
 		slog.Error("error polling for task", "err", pollResponse.StatusCode())
@@ -256,11 +281,13 @@ func StringifyEnvironmentVariables(inputVars [][]string) []string {
 	return envVars
 }
 
-func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan taskStatusMessage) error {
+func (a *Agent) runWorker(ctx context.Context, task Task) error {
 	providedEnvVars := StringifyEnvironmentVariables(*task.WorkerEnvironmentVariables)
 	extraEnvVars := []string{
 		"RERUN_WORKER_ENVIRONMENT=dev",
 		fmt.Sprintf("RERUN_WORKER_DOCKER_NETWORK_MODE=%v", a.DockerNetworkMode),
+		fmt.Sprintf("RERUN_WORKER_CONTAINER_TIMEOUT=%v", task.ContainerTimeout),
+		fmt.Sprintf("RERUN_WORKER_WORKER_ID=%v", a.Name),
 	}
 	if a.Privileged {
 		extraEnvVars = append(extraEnvVars, "RERUN_WORKER_PRIVILEGED=true")
@@ -332,37 +359,27 @@ func (a *Agent) runWorker(ctx context.Context, task Task, taskStateChan chan tas
 		*task.TaskName,
 	)
 	if err != nil {
-		fmt.Println(err)
+		return errors.Wrapf(err, "error creating container for task %s", *task.TaskName)
 	}
 
 	err = a.Docker.ContainerStart(ctx, res.ID, container.StartOptions{})
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "error starting container for task %s", *task.TaskName)
 	}
 	slog.Info("Container for task starting", "task", *task.TaskName)
-	taskStateChan <- taskStatusMessage{
-		Name:   *task.TaskName,
-		Status: api.RUNNING,
-	}
+	// From now one, the worker is responsible for updating its own status.
 	a.setCurrentTask(*task.TaskName, api.RUNNING)
 	for {
 		status, err := a.Docker.ContainerInspect(ctx, res.ID)
 		if err != nil {
-			return err
+			a.setCurrentTask("", "")
+			return errors.Wrapf(err, "error inspecting container for task %s", *task.TaskName)
 		}
 		if status.State.Status != "running" {
 			if status.State.ExitCode == 0 {
 				slog.Info("Container for task succeeded", "task", *task.TaskName)
-				taskStateChan <- taskStatusMessage{
-					Name:   *task.TaskName,
-					Status: api.SUCCEEDED,
-				}
 			} else {
 				slog.Info("Container exited non-zero", "task", *task.TaskName, "exit_code", status.State.ExitCode, "err", status.State.Error)
-				taskStateChan <- taskStatusMessage{
-					Name:   *task.TaskName,
-					Status: api.ERROR,
-				}
 			}
 			a.setCurrentTask("", "")
 			break
@@ -414,14 +431,25 @@ func (a *Agent) startHeartbeat(ctx context.Context) error {
 func (a *Agent) updateTaskStatus(ctx context.Context, taskName string, status api.TaskStatus) error {
 	slog.Info("Updating task status", "task_name", taskName, "status", status)
 
-	_, err := a.APIClient.UpdateTask(ctx, taskName, api.UpdateTaskInput{
+	response, err := a.APIClient.UpdateTask(ctx, taskName, api.UpdateTaskInput{
 		Status: &status,
 	})
+	if err != nil {
+		slog.Error("Error updating task status", "err", err)
+		return err
+	}
 
-	return err
+	if response.StatusCode != 200 {
+		slog.Error("Received non-200 response from API when updating task status", "err", response.StatusCode)
+		return fmt.Errorf("error updating task status: %v", response.Status)
+	}
+
+	slog.Info("Task status updated", "task_name", taskName, "status", status)
+	return nil
 }
 
 func (a *Agent) setCurrentTask(taskName string, status api.TaskStatus) {
+	slog.Info("Setting current task", "task_name", taskName, "status", status)
 	a.CurrentTaskName = taskName
 	a.CurrentTaskStatus = status
 }
