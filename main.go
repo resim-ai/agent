@@ -359,11 +359,15 @@ func (a *Agent) runWorker(ctx context.Context, task Task) error {
 		*task.TaskName,
 	)
 	if err != nil {
+		// Try to remove container and volumes if there is an error:
+		a.removeContainer(ctx, res.ID)
 		return errors.Wrapf(err, "error creating container for task %s", *task.TaskName)
 	}
 
 	err = a.Docker.ContainerStart(ctx, res.ID, container.StartOptions{})
 	if err != nil {
+		// Try to remove container and volumes if there is an error:
+		a.removeContainer(ctx, res.ID)
 		return errors.Wrapf(err, "error starting container for task %s", *task.TaskName)
 	}
 	slog.Info("Container for task starting", "task", *task.TaskName)
@@ -388,9 +392,21 @@ func (a *Agent) runWorker(ctx context.Context, task Task) error {
 		}
 		time.Sleep(2 * time.Second)
 	}
+
+	// Remove container and volumes:
+	a.removeContainer(ctx, res.ID)
+
 	return nil
 }
 
+func (a *Agent) removeContainer(ctx context.Context, containerID string) {
+	err := a.Docker.ContainerRemove(ctx, containerID, container.RemoveOptions{
+		RemoveVolumes: true,
+	})
+	if err != nil {
+		slog.WarnContext(ctx, "error removing container", "error", err)
+	}
+}
 func Ptr[T any](t T) *T {
 	return &t
 }

@@ -18,6 +18,7 @@ type DockerClient interface {
 	ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *ocispec.Platform, containerName string) (container.CreateResponse, error)
 	ContainerStart(ctx context.Context, containerID string, options container.StartOptions) error
 	ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error)
+	ContainerRemove(ctx context.Context, containerID string, options container.RemoveOptions) error
 }
 
 type MockDockerClient struct {
@@ -45,6 +46,11 @@ func (m *MockDockerClient) ContainerInspect(ctx context.Context, containerID str
 }
 
 func (m *MockDockerClient) ContainerStart(ctx context.Context, containerID string, options container.StartOptions) error {
+	args := m.Called(ctx, containerID, options)
+	return args.Error(0)
+}
+
+func (m *MockDockerClient) ContainerRemove(ctx context.Context, containerID string, options container.RemoveOptions) error {
 	args := m.Called(ctx, containerID, options)
 	return args.Error(0)
 }

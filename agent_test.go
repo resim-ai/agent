@@ -195,6 +195,13 @@ func (s *AgentTestSuite) TestPrivilegedModeHostMode() {
 	succeededContainer := createTestContainer("succeeded", false)
 	s.mockDocker.On("ContainerInspect", mock.Anything, containerID).Return(succeededContainer, nil).Once()
 
+	s.mockDocker.On(
+		"ContainerRemove",
+		mock.Anything,
+		containerID,
+		mock.Anything,
+	).Return(nil).Once()
+
 	err := s.agent.Start()
 	s.NoError(err)
 
@@ -295,6 +302,13 @@ func (s *AgentTestSuite) TestDefaultAgentDockeModes() {
 
 	succeededContainer := createTestContainer("succeeded", false)
 	s.mockDocker.On("ContainerInspect", mock.Anything, containerID).Return(succeededContainer, nil).Once()
+
+	s.mockDocker.On(
+		"ContainerRemove",
+		mock.Anything,
+		containerID,
+		mock.Anything,
+	).Return(nil).Once()
 
 	err := s.agent.Start()
 	s.NoError(err)
