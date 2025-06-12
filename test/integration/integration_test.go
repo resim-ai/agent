@@ -57,7 +57,7 @@ func TestAgentTestSuite(t *testing.T) {
 func (s *AgentTestSuite) TestAgentWithS3Experience() {
 	realMetrics := true
 	s.createS3TestExperience()
-	batch := s.createAndAwaitBatch(s.buildIDS3, s.s3Experiences, false, realMetrics)
+	batch := s.createAndAwaitBatch(s.buildIDS3, s.s3Experiences, s.sharedMemoryMb, false, realMetrics)
 	jobsResponse, err := s.APIClient.ListJobsWithResponse(
 		context.Background(),
 		s.projectID,
@@ -98,7 +98,7 @@ func (s *AgentTestSuite) TestAgentWithS3Experience() {
 func (s *AgentTestSuite) TestAgentWithLocalExperience() {
 	realMetrics := false
 	s.createLocalTestExperiences(nil)
-	batch := s.createAndAwaitBatch(s.buildIDLocal, s.localExperiences, false, realMetrics)
+	batch := s.createAndAwaitBatch(s.buildIDLocal, s.localExperiences, s.sharedMemoryMb, false, realMetrics)
 	jobsResponse, err := s.APIClient.ListJobsWithResponse(
 		context.Background(),
 		s.projectID,
@@ -139,7 +139,7 @@ func (s *AgentTestSuite) TestAgentWithLocalExperience() {
 func (s *AgentTestSuite) TestDockerAgentWithS3Experience() {
 	realMetrics := true
 	s.createS3TestExperience()
-	batch := s.createAndAwaitBatch(s.buildIDS3, s.s3Experiences, true, realMetrics)
+	batch := s.createAndAwaitBatch(s.buildIDS3, s.s3Experiences, s.sharedMemoryMb, true, realMetrics)
 	jobsResponse, err := s.APIClient.ListJobsWithResponse(
 		context.Background(),
 		s.projectID,

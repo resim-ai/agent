@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -65,6 +66,7 @@ type AgentTestSuite struct {
 	APIHost          string
 	projectID        uuid.UUID
 	systemID         uuid.UUID
+	sharedMemoryMb   int
 	branchID         uuid.UUID
 	buildIDS3        uuid.UUID
 	buildIDLocal     uuid.UUID
@@ -252,6 +254,7 @@ func (s *AgentTestSuite) createTestSystem() {
 		os.Exit(1)
 	}
 	s.systemID = createSystemResponse.JSON201.SystemID
+	s.sharedMemoryMb = createSystemResponse.JSON201.BuildSharedMemoryMb
 }
 
 func (s *AgentTestSuite) createTestBranch() {
@@ -430,7 +433,7 @@ func Base64EncodeString(input string) []byte {
 	return base64Input
 }
 
-func (s *AgentTestSuite) createAndAwaitBatch(buildID uuid.UUID, experiences []uuid.UUID, isDocker bool, realMetrics bool) api.Batch {
+func (s *AgentTestSuite) createAndAwaitBatch(buildID uuid.UUID, experiences []uuid.UUID, sharedMemoryMb int, isDocker bool, realMetrics bool) api.Batch {
 	var poolLabels []string
 	if isDocker {
 		poolLabels = []string{
@@ -446,6 +449,7 @@ func (s *AgentTestSuite) createAndAwaitBatch(buildID uuid.UUID, experiences []uu
 		PoolLabels:    &poolLabels,
 		Parameters: &api.BatchParameters{
 			"buildID":         buildID.String(),
+			"sharedMemoryMb":  strconv.Itoa(sharedMemoryMb),
 			"repeatedBuildID": buildID.String(),
 			"shouldFail":      "false",
 		},
