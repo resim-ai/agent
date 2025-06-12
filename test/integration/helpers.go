@@ -338,7 +338,7 @@ func (s *AgentTestSuite) createS3TestExperience() {
 	s.s3Experiences = append(s.s3Experiences, createExperienceResponse.JSON201.ExperienceID)
 }
 
-func (s *AgentTestSuite) createLocalTestExperiences() {
+func (s *AgentTestSuite) createLocalTestExperiences(containerTimeout *int32) {
 	// Create an experience:
 	experienceName1 := "experience_1"
 	// experienceName2 := fmt.Sprintf("Test Experience %v", uuid.New())
@@ -351,6 +351,10 @@ func (s *AgentTestSuite) createLocalTestExperiences() {
 		Description: "description",
 		Location:    testLocation1,
 	}
+	if containerTimeout != nil {
+		createExperienceRequest.ContainerTimeoutSeconds = containerTimeout
+	}
+
 	createExperienceResponse, err := s.APIClient.CreateExperienceWithResponse(
 		context.Background(),
 		s.projectID,
@@ -462,7 +466,6 @@ func (s *AgentTestSuite) createAndAwaitBatch(buildID uuid.UUID, experiences []uu
 	}
 
 	batch := *createBatchResponse.JSON201
-
 	s.Eventually(func() bool {
 		getResponse, err := s.APIClient.GetBatchWithResponse(
 			context.Background(),

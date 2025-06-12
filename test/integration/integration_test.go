@@ -97,7 +97,7 @@ func (s *AgentTestSuite) TestAgentWithS3Experience() {
 // Test the agent with a batch where the experiences are baked into the image
 func (s *AgentTestSuite) TestAgentWithLocalExperience() {
 	realMetrics := false
-	s.createLocalTestExperiences()
+	s.createLocalTestExperiences(nil)
 	batch := s.createAndAwaitBatch(s.buildIDLocal, s.localExperiences, false, realMetrics)
 	jobsResponse, err := s.APIClient.ListJobsWithResponse(
 		context.Background(),

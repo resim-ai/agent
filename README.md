@@ -16,7 +16,7 @@ sudo chgrp docker /run/containerd/containerd.sock
 
 ## Configuration
 
-By default, the Agent loads config from `~/resim/config.yaml`, caches credentials in that directory, and logs to the same directory (as well as `stdout`), however these settings can be overridden by setting the following environment variables:
+By default, the Agent loads config from `~/.resim/config.yaml`, caches credentials in that directory, and logs to the same directory (as well as `stdout`), however these settings can be overridden by setting the following environment variables:
 
 - `RESIM_AGENT_CONFIG_DIR` - to point to a different configuration and cache directory. The Agent will load configuration from `config.yaml` in this directory and cache credentials here.
 - `RESIM_AGENT_LOG_DIR` - to point to a different _directory_ in which to write log files
@@ -64,6 +64,16 @@ environment-variables:
 ```
 
 Note that the `pool-labels` are an OR/ANY selection, that is, an agent running with the labels `big` and `small` will run jobs tagged with either of those labels.
+
+Note that to run in other ReSim environments, you can set the `api-host` and `auth-host` to the appropriate values for the environment you are targeting.
+
+## Building the agent
+
+```shell
+go build -o ./resim-agent ./
+```
+
+
 
 ## CI
 
