@@ -40,6 +40,7 @@ const (
 type taskStatusMessage struct {
 	Name   string
 	Status api.TaskStatus
+	Error  *api.ErrorType
 }
 
 type Agent struct {
@@ -140,7 +141,7 @@ func (a *Agent) Start() error {
 		for {
 			select {
 			case taskStatusMessage := <-taskStateChan:
-				err := a.updateTaskStatus(ctx, taskStatusMessage.Name, taskStatusMessage.Status)
+				err := a.updateTaskStatus(ctx, taskStatusMessage.Name, taskStatusMessage.Status, taskStatusMessage.Error)
 				if err != nil {
 					slog.Error("Error updating task status", "err", err)
 				}
@@ -184,6 +185,7 @@ func (a *Agent) Start() error {
 			taskStateChan <- taskStatusMessage{
 				Name:   *task.TaskName,
 				Status: api.ERROR,
+				Error:  Ptr(api.AGENTERRORPULLINGWORKERIMAGE),
 			}
 			a.setCurrentTask("", "")
 			continue
@@ -196,6 +198,7 @@ func (a *Agent) Start() error {
 			taskStateChan <- taskStatusMessage{
 				Name:   *task.TaskName,
 				Status: api.ERROR,
+				Error:  Ptr(api.AGENTERRORRUNNINGWORKER),
 			}
 			a.setCurrentTask("", "")
 			continue
@@ -443,12 +446,16 @@ func (a *Agent) startHeartbeat(ctx context.Context) error {
 	return nil
 }
 
-func (a *Agent) updateTaskStatus(ctx context.Context, taskName string, status api.TaskStatus) error {
+func (a *Agent) updateTaskStatus(ctx context.Context, taskName string, status api.TaskStatus, error *api.ErrorType) error {
 	slog.Info("Updating task status", "task_name", taskName, "status", status)
 
-	response, err := a.APIClient.UpdateTask(ctx, taskName, api.UpdateTaskInput{
+	updateTaskInput := api.UpdateTaskInput{
 		Status: &status,
-	})
+	}
+	if error != nil {
+		updateTaskInput.ErrorType = error
+	}
+	response, err := a.APIClient.UpdateTask(ctx, taskName, updateTaskInput)
 	if err != nil {
 		slog.Error("Error updating task status", "err", err)
 		return err
