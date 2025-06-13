@@ -168,8 +168,7 @@ func (a *Agent) Start() error {
 		}
 
 		slog.Info("Got new task", "task_name", *task.TaskName)
-		// Set the current task with the agent and update the task status to
-		// SUBMITTED.
+		// Set the current task with the agent
 		a.setCurrentTask(*task.TaskName, api.SUBMITTED)
 		taskStateChan <- taskStatusMessage{
 			Name:   *task.TaskName,
@@ -287,7 +286,7 @@ func (a *Agent) runWorker(ctx context.Context, task Task) error {
 		"RERUN_WORKER_ENVIRONMENT=dev",
 		fmt.Sprintf("RERUN_WORKER_DOCKER_NETWORK_MODE=%v", a.DockerNetworkMode),
 		fmt.Sprintf("RERUN_WORKER_CONTAINER_TIMEOUT=%v", task.ContainerTimeout),
-		fmt.Sprintf("RERUN_WORKER_WORKER_ID=%v", *task.TaskName), // This is the task name, as per internal workloads.
+		fmt.Sprintf("RERUN_WORKER_WORKER_ID=%v", *task.TaskName), // This is the task name, which is the same as the worker ID for internal workloads.
 	}
 	if a.Privileged {
 		extraEnvVars = append(extraEnvVars, "RERUN_WORKER_PRIVILEGED=true")
