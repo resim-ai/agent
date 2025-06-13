@@ -22,11 +22,13 @@ const (
 
 // Defines values for ErrorType.
 const (
-	CUSTOMERWORKLOADERROR ErrorType = "CUSTOMER_WORKLOAD_ERROR"
-	Empty                 ErrorType = ""
-	NONZEROEXITCODE       ErrorType = "NONZERO_EXIT_CODE"
-	UNKNOWNERROR          ErrorType = "UNKNOWN_ERROR"
-	UNKNOWNWORKERERROR    ErrorType = "UNKNOWN_WORKER_ERROR"
+	AGENTERRORPULLINGWORKERIMAGE ErrorType = "AGENT_ERROR_PULLING_WORKER_IMAGE"
+	AGENTERRORRUNNINGWORKER      ErrorType = "AGENT_ERROR_RUNNING_WORKER"
+	CUSTOMERWORKLOADERROR        ErrorType = "CUSTOMER_WORKLOAD_ERROR"
+	Empty                        ErrorType = ""
+	NONZEROEXITCODE              ErrorType = "NONZERO_EXIT_CODE"
+	UNKNOWNERROR                 ErrorType = "UNKNOWN_ERROR"
+	UNKNOWNWORKERERROR           ErrorType = "UNKNOWN_WORKER_ERROR"
 )
 
 // Defines values for TaskStatus.
@@ -69,6 +71,7 @@ type TaskPollInput struct {
 // TaskPollOutput defines model for taskPollOutput.
 type TaskPollOutput struct {
 	ContainerTimeout           string                 `json:"containerTimeout"`
+	RunCounter                 *int                   `json:"runCounter,omitempty"`
 	Tags                       *[]TagPair             `json:"tags,omitempty"`
 	TaskName                   *TaskName              `json:"taskName,omitempty"`
 	WorkerEnvironmentVariables *[]EnvironmentVariable `json:"workerEnvironmentVariables,omitempty"`

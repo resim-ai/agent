@@ -26,7 +26,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const agentVersion = "v0.5.0"
+const agentVersion = "v0.6.0"
 
 type agentStatus string
 
@@ -40,6 +40,7 @@ const (
 type taskStatusMessage struct {
 	Name   string
 	Status api.TaskStatus
+	Error  *api.ErrorType
 }
 
 type Agent struct {
@@ -140,7 +141,7 @@ func (a *Agent) Start() error {
 		for {
 			select {
 			case taskStatusMessage := <-taskStateChan:
-				err := a.updateTaskStatus(ctx, taskStatusMessage.Name, taskStatusMessage.Status)
+				err := a.updateTaskStatus(ctx, taskStatusMessage.Name, taskStatusMessage.Status, taskStatusMessage.Error)
 				if err != nil {
 					slog.Error("Error updating task status", "err", err)
 				}
@@ -168,8 +169,7 @@ func (a *Agent) Start() error {
 		}
 
 		slog.Info("Got new task", "task_name", *task.TaskName)
-		// Set the current task with the agent and update the task status to
-		// SUBMITTED.
+		// Set the current task with the agent
 		a.setCurrentTask(*task.TaskName, api.SUBMITTED)
 		taskStateChan <- taskStatusMessage{
 			Name:   *task.TaskName,
@@ -185,6 +185,7 @@ func (a *Agent) Start() error {
 			taskStateChan <- taskStatusMessage{
 				Name:   *task.TaskName,
 				Status: api.ERROR,
+				Error:  Ptr(api.AGENTERRORPULLINGWORKERIMAGE),
 			}
 			a.setCurrentTask("", "")
 			continue
@@ -193,10 +194,11 @@ func (a *Agent) Start() error {
 		// Attempt to run the worker; if this fails, we need to error the task.
 		err = a.runWorker(ctx, Task(task))
 		if err != nil {
-			slog.Error("Error running worker", "err", err)
+			slog.Error("Error running ReSim worker", "err", err)
 			taskStateChan <- taskStatusMessage{
 				Name:   *task.TaskName,
 				Status: api.ERROR,
+				Error:  Ptr(api.AGENTERRORRUNNINGWORKER),
 			}
 			a.setCurrentTask("", "")
 			continue
@@ -287,7 +289,7 @@ func (a *Agent) runWorker(ctx context.Context, task Task) error {
 		"RERUN_WORKER_ENVIRONMENT=dev",
 		fmt.Sprintf("RERUN_WORKER_DOCKER_NETWORK_MODE=%v", a.DockerNetworkMode),
 		fmt.Sprintf("RERUN_WORKER_CONTAINER_TIMEOUT=%v", task.ContainerTimeout),
-		fmt.Sprintf("RERUN_WORKER_WORKER_ID=%v", a.Name),
+		fmt.Sprintf("RERUN_WORKER_WORKER_ID=%v", *task.TaskName), // This is the task name, which is the same as the worker ID for internal workloads.
 	}
 	if a.Privileged {
 		extraEnvVars = append(extraEnvVars, "RERUN_WORKER_PRIVILEGED=true")
@@ -350,6 +352,12 @@ func (a *Agent) runWorker(ctx context.Context, task Task) error {
 		})
 	}
 
+	slog.Info("About to print environment variables")
+
+	for _, envVar := range config.Env {
+		slog.Info("Environment variable", "name", envVar)
+	}
+
 	res, err := a.Docker.ContainerCreate(
 		context.TODO(),
 		config,
@@ -359,11 +367,15 @@ func (a *Agent) runWorker(ctx context.Context, task Task) error {
 		*task.TaskName,
 	)
 	if err != nil {
+		// Try to remove container and volumes if there is an error:
+		a.removeContainer(ctx, res.ID)
 		return errors.Wrapf(err, "error creating container for task %s", *task.TaskName)
 	}
 
 	err = a.Docker.ContainerStart(ctx, res.ID, container.StartOptions{})
 	if err != nil {
+		// Try to remove container and volumes if there is an error:
+		a.removeContainer(ctx, res.ID)
 		return errors.Wrapf(err, "error starting container for task %s", *task.TaskName)
 	}
 	slog.Info("Container for task starting", "task", *task.TaskName)
@@ -388,9 +400,21 @@ func (a *Agent) runWorker(ctx context.Context, task Task) error {
 		}
 		time.Sleep(2 * time.Second)
 	}
+
+	// Remove container and volumes:
+	a.removeContainer(ctx, res.ID)
+
 	return nil
 }
 
+func (a *Agent) removeContainer(ctx context.Context, containerID string) {
+	err := a.Docker.ContainerRemove(ctx, containerID, container.RemoveOptions{
+		RemoveVolumes: true,
+	})
+	if err != nil {
+		slog.WarnContext(ctx, "error removing container", "error", err)
+	}
+}
 func Ptr[T any](t T) *T {
 	return &t
 }
@@ -428,12 +452,16 @@ func (a *Agent) startHeartbeat(ctx context.Context) error {
 	return nil
 }
 
-func (a *Agent) updateTaskStatus(ctx context.Context, taskName string, status api.TaskStatus) error {
+func (a *Agent) updateTaskStatus(ctx context.Context, taskName string, status api.TaskStatus, error *api.ErrorType) error {
 	slog.Info("Updating task status", "task_name", taskName, "status", status)
 
-	response, err := a.APIClient.UpdateTask(ctx, taskName, api.UpdateTaskInput{
+	updateTaskInput := api.UpdateTaskInput{
 		Status: &status,
-	})
+	}
+	if error != nil {
+		updateTaskInput.ErrorType = error
+	}
+	response, err := a.APIClient.UpdateTask(ctx, taskName, updateTaskInput)
 	if err != nil {
 		slog.Error("Error updating task status", "err", err)
 		return err
