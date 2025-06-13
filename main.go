@@ -352,6 +352,12 @@ func (a *Agent) runWorker(ctx context.Context, task Task) error {
 		})
 	}
 
+	slog.Info("About to print environment variables")
+
+	for _, envVar := range config.Env {
+		slog.Info("Environment variable", "name", envVar)
+	}
+
 	res, err := a.Docker.ContainerCreate(
 		context.TODO(),
 		config,
