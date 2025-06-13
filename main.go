@@ -194,7 +194,7 @@ func (a *Agent) Start() error {
 		// Attempt to run the worker; if this fails, we need to error the task.
 		err = a.runWorker(ctx, Task(task))
 		if err != nil {
-			slog.Error("Error running worker", "err", err)
+			slog.Error("Error running ReSim worker", "err", err)
 			taskStateChan <- taskStatusMessage{
 				Name:   *task.TaskName,
 				Status: api.ERROR,
