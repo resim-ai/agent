@@ -361,9 +361,11 @@ func (s *AgentTestSuite) createLocalTestExperiences(containerTimeout *int32) {
 	// testLocation2 := "/test_experience_data/experience_1"
 
 	createExperienceRequest := api.CreateExperienceInput{
-		Name:        experienceName1,
-		Description: "description",
-		Location:    testLocation1,
+		Name:                 experienceName1,
+		Description:          "description",
+		Location:             testLocation1,
+		Profile:              Ptr(TestProfile),
+		EnvironmentVariables: Ptr(KnownEnvironmentVariables()),
 	}
 	if containerTimeout != nil {
 		createExperienceRequest.ContainerTimeoutSeconds = containerTimeout
