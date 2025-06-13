@@ -9,6 +9,19 @@ on:
         description: Environment to destroy
         type: string
         required: true
+  workflow_call:
+    secrets:
+      DEPLOYMENT_BOT_APP_ID:
+        required: true
+      DEPLOYMENT_BOT_PRIVATE_KEY:
+        required: true
+      agent_password:
+        required: true
+    inputs:
+      environment:
+        description: Environment to destroy
+        type: string
+        required: true
 
 permissions:
   id-token: write
@@ -24,7 +37,7 @@ jobs:
       TF_VAR_environment: "${{ inputs.environment }}"
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Generate Deployment Bot token
         id: generate_token
