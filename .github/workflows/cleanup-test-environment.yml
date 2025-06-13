@@ -10,6 +10,13 @@ on:
         type: string
         required: true
   workflow_call:
+    secrets:
+      DEPLOYMENT_BOT_APP_ID:
+        required: true
+      DEPLOYMENT_BOT_PRIVATE_KEY:
+        required: true
+      agent_password:
+        required: true
     inputs:
       environment:
         description: Environment to destroy

@@ -310,6 +310,11 @@ jobs:
       DEPLOYMENT_BOT_PRIVATE_KEY: ${{ secrets.DEPLOYMENT_BOT_PRIVATE_KEY }}
 
   stop_instance:
+    needs: [test]
     uses: ./.github/workflows/cleanup-test-environment.yml
     with:
       environment: ${{ inputs.environment }}
+    secrets:
+      DEPLOYMENT_BOT_APP_ID: ${{ secrets.DEPLOYMENT_BOT_APP_ID }}
+      DEPLOYMENT_BOT_PRIVATE_KEY: ${{ secrets.DEPLOYMENT_BOT_PRIVATE_KEY }}
+      agent_password: ${{ secrets.AGENT_TEST_PASSWORD }}
