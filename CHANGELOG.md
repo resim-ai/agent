@@ -6,7 +6,7 @@ Changes and release notes for the ReSim agent
 
 ## v0.6.0 - 2025-06-12
 
-- Ensures that containers are removed if there is a failure for running the ReSim Worker
+- Ensures that containers are removed if there is a failure running the ReSim Worker
 
 ## v0.5.0 - 2025-03-28
 
