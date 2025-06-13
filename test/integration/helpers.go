@@ -88,6 +88,15 @@ func Ptr[T any](t T) *T {
 	return &t
 }
 
+const TestProfile string = "mcb"
+
+func KnownEnvironmentVariables() []api.EnvironmentVariable {
+	return []api.EnvironmentVariable{
+		{Name: "TEST_ENV_VAR", Value: "test_value"},
+		{Name: "TEST_ENV_VAR_2", Value: "test_value_2"},
+	}
+}
+
 func ListExpectedOutputFiles(realMetrics bool) []string {
 	expectedOutputFiles := []string{
 		TestMCAPFile,
@@ -282,7 +291,7 @@ func (s *AgentTestSuite) createBuild(imageURI string) uuid.UUID {
 	createRequest := api.CreateBuildForBranchInput{
 		SystemID:    s.systemID,
 		Description: &buildDescription,
-		ImageUri:    imageURI,
+		ImageUri:    Ptr(imageURI),
 		Version:     buildVersion,
 	}
 	createBuildResponse, err := s.APIClient.CreateBuildForBranchWithResponse(
@@ -325,9 +334,11 @@ func (s *AgentTestSuite) createS3TestExperience() {
 	testLocation := s.generateAndUploadExperience(context.Background(), experienceName)
 
 	createExperienceRequest := api.CreateExperienceInput{
-		Name:        experienceName,
-		Description: "description",
-		Location:    testLocation,
+		Name:                 experienceName,
+		Description:          "description",
+		Location:             testLocation,
+		Profile:              Ptr(TestProfile),
+		EnvironmentVariables: Ptr(KnownEnvironmentVariables()),
 	}
 	createExperienceResponse, err := s.APIClient.CreateExperienceWithResponse(
 		context.Background(),
