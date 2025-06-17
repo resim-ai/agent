@@ -99,6 +99,10 @@ resource "aws_instance" "test_agent" {
   }
 
   user_data = data.cloudinit_config.config.rendered
+
+  root_block_device {
+    volume_type = "gp3"
+  }
 }
 
 resource "aws_iam_policy" "this" {
