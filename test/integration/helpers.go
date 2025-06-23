@@ -31,6 +31,7 @@ const (
 	// A pair of constants used for creating actual experience data for test experiences
 	ExpectedExperienceNameFile       string = "experience_name.txt"
 	ExpectedExperienceNameBase64File string = "experience_name.base64"
+	ExpectedExperienceNameOutputFile string = "ExperienceName.zip"
 
 	experienceBuildURI string = "909785973729.dkr.ecr.us-east-1.amazonaws.com/rerun-end-to-end-test-experience-build:latest"
 	metricsBuildURI    string = "909785973729.dkr.ecr.us-east-1.amazonaws.com/rerun-end-to-end-test-metrics-build:latest"
@@ -106,7 +107,7 @@ func ListExpectedOutputFiles(realMetrics bool) []string {
 		"experience-container.log",
 		"metrics-worker.log",
 		"metrics-container.log",
-		ExpectedExperienceNameFile,
+		ExpectedExperienceNameOutputFile,
 		ExpectedExperienceNameBase64File,
 		"test_config.json",
 		TestReRunFile,
@@ -118,7 +119,7 @@ func ListExpectedOutputFiles(realMetrics bool) []string {
 			"metrics.binproto",
 			fmt.Sprintf("metrics-%v", TestMCAPFile),
 			fmt.Sprintf("metrics-%v", TestMP4File),
-			fmt.Sprintf("metrics-%v", ExpectedExperienceNameFile),
+			fmt.Sprintf("metrics-%v", ExpectedExperienceNameOutputFile),
 			fmt.Sprintf("metrics-%v", ExpectedExperienceNameBase64File),
 			"test_config.json",
 			"test_file.txt", // from an external file metric
