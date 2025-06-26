@@ -32,6 +32,8 @@ const (
 	ExpectedExperienceNameFile       string = "experience_name.txt"
 	ExpectedExperienceNameBase64File string = "experience_name.base64"
 	ExpectedExperienceNameOutputFile string = "ExperienceName.zip"
+	// The subdirectory for the ExperienceNameFile
+	ExpectedExperienceNameSubdir string = "ExperienceName"
 
 	experienceBuildURI string = "909785973729.dkr.ecr.us-east-1.amazonaws.com/rerun-end-to-end-test-experience-build:latest"
 	metricsBuildURI    string = "909785973729.dkr.ecr.us-east-1.amazonaws.com/rerun-end-to-end-test-metrics-build:latest"
@@ -332,12 +334,12 @@ func (s *AgentTestSuite) createS3TestExperience() {
 	// Create an experience:
 	experienceName := fmt.Sprintf("Test Experience %v", uuid.New())
 	// Generate a location and upload some experience files:
-	testLocation := s.generateAndUploadExperience(context.Background(), experienceName)
+	testLocations := s.generateAndUploadExperienceData(context.Background(), experienceName)
 
 	createExperienceRequest := api.CreateExperienceInput{
 		Name:                 experienceName,
 		Description:          "description",
-		Location:             testLocation,
+		Locations:            &testLocations,
 		Profile:              Ptr(TestProfile),
 		EnvironmentVariables: Ptr(KnownEnvironmentVariables()),
 	}
@@ -356,15 +358,14 @@ func (s *AgentTestSuite) createS3TestExperience() {
 func (s *AgentTestSuite) createLocalTestExperiences(containerTimeout *int32) {
 	// Create an experience:
 	experienceName1 := "experience_1"
-	// experienceName2 := fmt.Sprintf("Test Experience %v", uuid.New())
 
-	testLocation1 := "/test_experience_data/experience_1/"
-	// testLocation2 := "/test_experience_data/experience_1"
+	testLocation1 := "/test_experience_data/experience_1/experience_name.base64"
+	testLocation2 := "/test_experience_data/experience_1/ExperienceName/"
 
 	createExperienceRequest := api.CreateExperienceInput{
 		Name:                 experienceName1,
 		Description:          "description",
-		Location:             testLocation1,
+		Locations:            &[]string{testLocation1, testLocation2},
 		Profile:              Ptr(TestProfile),
 		EnvironmentVariables: Ptr(KnownEnvironmentVariables()),
 	}
@@ -384,18 +385,26 @@ func (s *AgentTestSuite) createLocalTestExperiences(containerTimeout *int32) {
 	s.localExperiences = append(s.localExperiences, createExperienceResponse.JSON201.ExperienceID)
 }
 
-// Generates an experience and uploads it to an s3 path
-func (s *AgentTestSuite) generateAndUploadExperience(ctx context.Context, experienceName string) string {
+// Generates some experience data and uploads it to some s3 paths
+func (s *AgentTestSuite) generateAndUploadExperienceData(ctx context.Context, experienceName string) []string {
 	// Use the experience name to create a single file:
 	// name.experience
 	// Then also create a base64 encoded version of the name as
 	// name.base64
-	// Upload these to s3 in the test bucket:
-	// test-bucket/experiences/{uniqueID}
-	// Return the s3 path to the experience:
+	// Upload these to s3 in the e2e test bucket in two specific locations:
+	// e2e-test-bucket/experiences/location1/{uniqueID}/subdir/
+	// and
+	// e2e-test-bucket/experiences/location2/{uniqueID}
+	// Return the s3 paths to the experiences:
+	// One as a prefix, and one as a file name
 
-	testLocation := fmt.Sprintf("s3://%s/experiences/%s/", s.experienceBucket, uuid.New())
-	locationURL, err := url.Parse(testLocation)
+	experienceLocation1 := fmt.Sprintf("s3://%s/experiences/location1/%s/", s.experienceBucket, uuid.New())
+	experienceLocation2 := fmt.Sprintf("s3://%s/experiences/location2/%s/", s.experienceBucket, uuid.New())
+	uploadLocation1, err := url.Parse(fmt.Sprintf("%s%s/", experienceLocation1, ExpectedExperienceNameSubdir))
+	if err != nil {
+		log.Fatal(err)
+	}
+	uploadLocation2, err := url.Parse(experienceLocation2)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -409,9 +418,11 @@ func (s *AgentTestSuite) generateAndUploadExperience(ctx context.Context, experi
 	data := []byte(experienceName)
 	base64Name := Base64EncodeString(experienceName)
 	// Upload the data to s3:
-	uploadFile(ctx, uploader, ExpectedExperienceNameFile, locationURL, data)
-	uploadFile(ctx, uploader, ExpectedExperienceNameBase64File, locationURL, base64Name)
-	return testLocation
+	uploadFile(ctx, uploader, ExpectedExperienceNameFile, uploadLocation1, data)
+	uploadFile(ctx, uploader, ExpectedExperienceNameBase64File, uploadLocation2, base64Name)
+	// Return the s3 paths to the experiences:
+	// One as a prefix, and one as a file name
+	return []string{experienceLocation1, fmt.Sprintf("%s%s", experienceLocation2, ExpectedExperienceNameBase64File)}
 }
 
 func uploadFile(

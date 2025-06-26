@@ -238,6 +238,8 @@ github.com/resim-ai/api-client v0.12.0 h1:vAVTbOmfrKxKYRYZV+7oyQY0L/la26ISqC/Ecj
 github.com/resim-ai/api-client v0.12.0/go.mod h1:W5FrIOyIiBkP70b9AJsgy/2M/5lf4M+8l+W+ju3csPY=
 github.com/resim-ai/api-client v0.18.0 h1:yRTynwHSV/Q6tBPlG0wfqnqB5+MgXbKu7X0ARVJFKyI=
 github.com/resim-ai/api-client v0.18.0/go.mod h1:gdzCngwXyMnFd0R7Y7gf6qHDnwrT92LiqsdvcHV/5z0=
+github.com/resim-ai/api-client v0.20.0 h1:0a2KLxnzVu4xV9GUlczPkMGLsH1W7RE33P0+4IgXPCg=
+github.com/resim-ai/api-client v0.20.0/go.mod h1:gdzCngwXyMnFd0R7Y7gf6qHDnwrT92LiqsdvcHV/5z0=
 github.com/rogpeppe/go-internal v1.12.0 h1:exVL4IDcn6na9z1rAb56Vxr+CgyK3nn3O+epU5NdKM8=
 github.com/rogpeppe/go-internal v1.12.0/go.mod h1:E+RYuTGaKKdloAfM02xzb0FW3Paa99yedzYV+kq4uf4=
 github.com/sagikazarmark/locafero v0.6.0 h1:ON7AQg37yzcRPU69mt7gwhFEBwxI6P9T4Qu3N51bwOk=
