@@ -360,7 +360,7 @@ func (s *AgentTestSuite) createLocalTestExperiences(containerTimeout *int32) {
 	experienceName1 := "experience_1"
 
 	testLocation1 := "/test_experience_data/experience_1/experience_name.base64"
-	testLocation2 := "/test_experience_data/experience_1/ExperienceName/"
+	testLocation2 := "/test_experience_data/experience_1/"
 
 	createExperienceRequest := api.CreateExperienceInput{
 		Name:                 experienceName1,
