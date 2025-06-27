@@ -11,7 +11,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/oapi-codegen/oapi-codegen/v2 v2.4.1
 	github.com/oapi-codegen/runtime v1.1.1
-	github.com/resim-ai/api-client v0.18.0
+	github.com/resim-ai/api-client v0.20.0
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/mod v0.22.0
