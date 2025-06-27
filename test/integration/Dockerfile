@@ -10,7 +10,7 @@ RUN mkdir -p /test_experience_data/experience_1 &&\
   mkdir -p /test_experience_data/experience_1/ExperienceName &&\
   touch /test_experience_data/experience_1/ExperienceName/experience_name.txt &&\
   touch /test_experience_data/experience_1/experience_name.base64 &&\
-  echo -n "experience_1" > /test_experience_data/experience_1/ExperienceName/experience_name.txt &&\
-  echo -n "experience_1" | base64 -w 0 > /test_experience_data/experience_1/experience_name.base64
+  echo -n "experience_1" > /test_experience_data/experience_location_2/ExperienceName/experience_name.txt &&\
+  echo -n "experience_1" | base64 -w 0 > /test_experience_data/experience_location_1/experience_name.base64
 
 USER 1000
