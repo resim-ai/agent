@@ -7,8 +7,9 @@ USER root
 # trunk-ignore(hadolint/DL4006)
 # trunk-ignore(hadolint/SC3037)
 RUN mkdir -p /test_experience_data/experience_1 &&\
-  mkdir -p /test_experience_data/experience_1/ExperienceName &&\
-  touch /test_experience_data/experience_1/ExperienceName/experience_name.txt &&\
+mkdir -p /test_experience_data/experience_2 &&\  
+mkdir -p /test_experience_data/experience_2/ExperienceName &&\
+  touch /test_experience_data/experience_2/ExperienceName/experience_name.txt &&\
   touch /test_experience_data/experience_1/experience_name.base64 &&\
   echo -n "experience_1" > /test_experience_data/experience_location_2/ExperienceName/experience_name.txt &&\
   echo -n "experience_1" | base64 -w 0 > /test_experience_data/experience_location_1/experience_name.base64
