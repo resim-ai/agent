@@ -21,7 +21,9 @@
 go.work
 go.work.sum
 
+# binaries
 agent
+resim-agent
 
 # Terraform
 .terraform

@@ -13,12 +13,12 @@ import (
 )
 
 func (s *AgentTestSuite) SetupTest() {
-	s.createTestProject()
-	s.createTestSystem()
-	s.createTestBranch()
-	s.buildIDS3 = s.createBuild(experienceBuildURI)
-	s.buildIDLocal = s.createBuild(viper.GetViper().GetString(LocalImageKey))
-	s.createMetricsBuild()
+	s.CreateTestProject()
+	s.CreateTestSystem()
+	s.CreateTestBranch()
+	s.BuildIDS3 = s.CreateBuild(ExperienceBuildURI)
+	s.BuildIDLocal = s.CreateBuild(viper.GetViper().GetString(LocalImageKey))
+	s.CreateMetricsBuild()
 }
 
 func TestAgentTestSuite(t *testing.T) {
@@ -40,10 +40,10 @@ func TestAgentTestSuite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), apiCheckTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), ApiCheckTimeout)
 	defer cancel()
 
-	err = CheckAPIAvailability(ctx, apiHost, apiCheckInterval)
+	err = CheckAPIAvailability(ctx, apiHost, ApiCheckInterval)
 	if err != nil {
 		t.Fatal(err)
 	} else {
@@ -56,11 +56,11 @@ func TestAgentTestSuite(t *testing.T) {
 // Test the agent with a batch where the experiences are in S3
 func (s *AgentTestSuite) TestAgentWithS3Experience() {
 	realMetrics := true
-	s.createS3TestExperience()
-	batch := s.createAndAwaitBatch(s.buildIDS3, s.s3Experiences, s.sharedMemoryMb, false, realMetrics)
+	s.CreateS3TestExperience()
+	batch := s.CreateAndAwaitBatch(s.BuildIDS3, s.S3Experiences, s.SharedMemoryMb, false, realMetrics)
 	jobsResponse, err := s.APIClient.ListJobsWithResponse(
 		context.Background(),
-		s.projectID,
+		s.ProjectID,
 		*batch.BatchID,
 		&api.ListJobsParams{
 			PageSize: Ptr(100),
@@ -76,7 +76,7 @@ func (s *AgentTestSuite) TestAgentWithS3Experience() {
 		fmt.Printf("Checking logs for Job ID: %v\n", *job.JobID)
 		listLogsResponse, err := s.APIClient.ListJobLogsForJobWithResponse(
 			context.Background(),
-			s.projectID,
+			s.ProjectID,
 			*batch.BatchID,
 			*job.JobID,
 			&api.ListJobLogsForJobParams{
@@ -97,11 +97,11 @@ func (s *AgentTestSuite) TestAgentWithS3Experience() {
 // Test the agent with a batch where the experiences are baked into the image
 func (s *AgentTestSuite) TestAgentWithLocalExperience() {
 	realMetrics := false
-	s.createLocalTestExperiences(nil)
-	batch := s.createAndAwaitBatch(s.buildIDLocal, s.localExperiences, s.sharedMemoryMb, false, realMetrics)
+	s.CreateLocalTestExperiences(nil)
+	batch := s.CreateAndAwaitBatch(s.BuildIDLocal, s.LocalExperiences, s.SharedMemoryMb, false, realMetrics)
 	jobsResponse, err := s.APIClient.ListJobsWithResponse(
 		context.Background(),
-		s.projectID,
+		s.ProjectID,
 		*batch.BatchID,
 		&api.ListJobsParams{
 			PageSize: Ptr(100),
@@ -117,7 +117,7 @@ func (s *AgentTestSuite) TestAgentWithLocalExperience() {
 		fmt.Printf("Checking logs for Job ID: %v\n", *job.JobID)
 		listLogsResponse, err := s.APIClient.ListJobLogsForJobWithResponse(
 			context.Background(),
-			s.projectID,
+			s.ProjectID,
 			*batch.BatchID,
 			*job.JobID,
 			&api.ListJobLogsForJobParams{
@@ -138,11 +138,11 @@ func (s *AgentTestSuite) TestAgentWithLocalExperience() {
 // Test the agent with a batch where the experiences are in S3
 func (s *AgentTestSuite) TestDockerAgentWithS3Experience() {
 	realMetrics := true
-	s.createS3TestExperience()
-	batch := s.createAndAwaitBatch(s.buildIDS3, s.s3Experiences, s.sharedMemoryMb, true, realMetrics)
+	s.CreateS3TestExperience()
+	batch := s.CreateAndAwaitBatch(s.BuildIDS3, s.S3Experiences, s.SharedMemoryMb, true, realMetrics)
 	jobsResponse, err := s.APIClient.ListJobsWithResponse(
 		context.Background(),
-		s.projectID,
+		s.ProjectID,
 		*batch.BatchID,
 		&api.ListJobsParams{
 			PageSize: Ptr(100),
@@ -158,7 +158,7 @@ func (s *AgentTestSuite) TestDockerAgentWithS3Experience() {
 		fmt.Printf("Checking logs for Job ID: %v\n", *job.JobID)
 		listLogsResponse, err := s.APIClient.ListJobLogsForJobWithResponse(
 			context.Background(),
-			s.projectID,
+			s.ProjectID,
 			*batch.BatchID,
 			*job.JobID,
 			&api.ListJobLogsForJobParams{

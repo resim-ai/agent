@@ -39,6 +39,21 @@ const (
 	SUCCEEDED TaskStatus = "SUCCEEDED"
 )
 
+// AgentCheckinInput defines model for agentCheckinInput.
+type AgentCheckinInput struct {
+	AgentID      *string      `json:"agentID,omitempty"`
+	AgentVersion *string      `json:"agentVersion,omitempty"`
+	PoolLabels   *[]PoolLabel `json:"poolLabels,omitempty"`
+}
+
+// AgentCheckinOutput defines model for agentCheckinOutput.
+type AgentCheckinOutput struct {
+	AuthToken                  *string                `json:"authToken,omitempty"`
+	RequiredAgentVersion       *string                `json:"requiredAgentVersion,omitempty"`
+	WorkerEnvironmentVariables *[]EnvironmentVariable `json:"workerEnvironmentVariables,omitempty"`
+	WorkerImageURI             *string                `json:"workerImageURI,omitempty"`
+}
+
 // AgentHeartbeatInput defines model for agentHeartbeatInput.
 type AgentHeartbeatInput struct {
 	AgentName  *string      `json:"agentName,omitempty"`
@@ -87,6 +102,9 @@ type UpdateTaskInput struct {
 	Output    *string     `json:"output"`
 	Status    *TaskStatus `json:"status,omitempty"`
 }
+
+// AgentCheckinJSONRequestBody defines body for AgentCheckin for application/json ContentType.
+type AgentCheckinJSONRequestBody = AgentCheckinInput
 
 // AgentHeartbeatJSONRequestBody defines body for AgentHeartbeat for application/json ContentType.
 type AgentHeartbeatJSONRequestBody = AgentHeartbeatInput
@@ -170,6 +188,11 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+	// AgentCheckinWithBody request with any body
+	AgentCheckinWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	AgentCheckin(ctx context.Context, body AgentCheckinJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// AgentAPIPing request
 	AgentAPIPing(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -190,6 +213,30 @@ type ClientInterface interface {
 	UpdateTaskWithBody(ctx context.Context, taskName TaskName, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	UpdateTask(ctx context.Context, taskName TaskName, body UpdateTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+func (c *Client) AgentCheckinWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAgentCheckinRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) AgentCheckin(ctx context.Context, body AgentCheckinJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAgentCheckinRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 func (c *Client) AgentAPIPing(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -286,6 +333,46 @@ func (c *Client) UpdateTask(ctx context.Context, taskName TaskName, body UpdateT
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewAgentCheckinRequest calls the generic AgentCheckin builder with application/json body
+func NewAgentCheckinRequest(server string, body AgentCheckinJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewAgentCheckinRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewAgentCheckinRequestWithBody generates requests for AgentCheckin with any type of body
+func NewAgentCheckinRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/agent/checkin")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
 }
 
 // NewAgentAPIPingRequest generates requests for AgentAPIPing
@@ -512,6 +599,11 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
+	// AgentCheckinWithBodyWithResponse request with any body
+	AgentCheckinWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AgentCheckinResponse, error)
+
+	AgentCheckinWithResponse(ctx context.Context, body AgentCheckinJSONRequestBody, reqEditors ...RequestEditorFn) (*AgentCheckinResponse, error)
+
 	// AgentAPIPingWithResponse request
 	AgentAPIPingWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*AgentAPIPingResponse, error)
 
@@ -532,6 +624,28 @@ type ClientWithResponsesInterface interface {
 	UpdateTaskWithBodyWithResponse(ctx context.Context, taskName TaskName, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateTaskResponse, error)
 
 	UpdateTaskWithResponse(ctx context.Context, taskName TaskName, body UpdateTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateTaskResponse, error)
+}
+
+type AgentCheckinResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *AgentCheckinOutput
+}
+
+// Status returns HTTPResponse.Status
+func (r AgentCheckinResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r AgentCheckinResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
 }
 
 type AgentAPIPingResponse struct {
@@ -640,6 +754,23 @@ func (r UpdateTaskResponse) StatusCode() int {
 	return 0
 }
 
+// AgentCheckinWithBodyWithResponse request with arbitrary body returning *AgentCheckinResponse
+func (c *ClientWithResponses) AgentCheckinWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AgentCheckinResponse, error) {
+	rsp, err := c.AgentCheckinWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAgentCheckinResponse(rsp)
+}
+
+func (c *ClientWithResponses) AgentCheckinWithResponse(ctx context.Context, body AgentCheckinJSONRequestBody, reqEditors ...RequestEditorFn) (*AgentCheckinResponse, error) {
+	rsp, err := c.AgentCheckin(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAgentCheckinResponse(rsp)
+}
+
 // AgentAPIPingWithResponse request returning *AgentAPIPingResponse
 func (c *ClientWithResponses) AgentAPIPingWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*AgentAPIPingResponse, error) {
 	rsp, err := c.AgentAPIPing(ctx, reqEditors...)
@@ -707,6 +838,32 @@ func (c *ClientWithResponses) UpdateTaskWithResponse(ctx context.Context, taskNa
 		return nil, err
 	}
 	return ParseUpdateTaskResponse(rsp)
+}
+
+// ParseAgentCheckinResponse parses an HTTP response from a AgentCheckinWithResponse call
+func ParseAgentCheckinResponse(rsp *http.Response) (*AgentCheckinResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &AgentCheckinResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AgentCheckinOutput
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
 }
 
 // ParseAgentAPIPingResponse parses an HTTP response from a AgentAPIPingWithResponse call

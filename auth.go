@@ -60,7 +60,6 @@ func (a *Agent) Token() (*oauth2.Token, error) {
 
 func (a *Agent) authenticate(mode AuthMode) *oauth2.Token {
 
-	slog.Info("authenticating", "mode", mode)
 	tokenURL := fmt.Sprintf("%v/oauth/token", a.AuthHost)
 	username := viper.GetString(UsernameKey)
 	password := viper.GetString(PasswordKey)
