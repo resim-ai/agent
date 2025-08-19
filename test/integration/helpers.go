@@ -22,6 +22,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/google/uuid"
 	"github.com/resim-ai/api-client/api"
+
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"golang.org/x/oauth2"
@@ -31,9 +32,12 @@ const (
 	// A pair of constants used for creating actual experience data for test experiences
 	ExpectedExperienceNameFile       string = "experience_name.txt"
 	ExpectedExperienceNameBase64File string = "experience_name.base64"
+	ExpectedExperienceNameOutputFile string = "ExperienceName.zip"
+	// The subdirectory for the ExperienceNameFile
+	ExpectedExperienceNameSubdir string = "ExperienceName"
 
-	experienceBuildURI string = "909785973729.dkr.ecr.us-east-1.amazonaws.com/rerun-end-to-end-test-experience-build:latest"
-	metricsBuildURI    string = "909785973729.dkr.ecr.us-east-1.amazonaws.com/rerun-end-to-end-test-metrics-build:latest"
+	ExperienceBuildURI string = "909785973729.dkr.ecr.us-east-1.amazonaws.com/rerun-end-to-end-test-experience-build:latest"
+	MetricsBuildURI    string = "909785973729.dkr.ecr.us-east-1.amazonaws.com/rerun-end-to-end-test-metrics-build:latest"
 
 	// Output File Names
 	TestMCAPFile      string = "test.mcap"
@@ -41,8 +45,8 @@ const (
 	TestReRunFile     string = "test.rrd"
 	TestEmissionsFile string = "emissions.ndjson"
 
-	apiCheckTimeout  = 10 * time.Minute
-	apiCheckInterval = 10 * time.Second
+	ApiCheckTimeout  = 10 * time.Minute
+	ApiCheckInterval = 10 * time.Second
 
 	APIHostKey          = "api-host"
 	AuthHostKey         = "auth-host"
@@ -55,25 +59,25 @@ const (
 	EnvPrefix           = "AGENT_TEST"
 	LogLevelKey         = "log-level"
 	devClientID         = "LLNl3xsbNLSd16gQyYsiEn3tbLDZo1gj"
-	audience            = "https://api.resim.ai"
+	Audience            = "https://api.resim.ai"
 )
 
 type AgentTestSuite struct {
 	suite.Suite
-	experienceBucket string
+	ExperienceBucket string
 	APIClient        *api.ClientWithResponses
 	AuthHost         string
 	APIHost          string
-	projectID        uuid.UUID
-	systemID         uuid.UUID
-	sharedMemoryMb   int
-	branchID         uuid.UUID
-	buildIDS3        uuid.UUID
-	buildIDLocal     uuid.UUID
-	metricsBuildID   uuid.UUID
-	s3Experiences    []uuid.UUID
-	localExperiences []uuid.UUID
-	poolLabels       api.PoolLabels
+	ProjectID        uuid.UUID
+	SystemID         uuid.UUID
+	SharedMemoryMb   int
+	BranchID         uuid.UUID
+	BuildIDS3        uuid.UUID
+	BuildIDLocal     uuid.UUID
+	MetricsBuildID   uuid.UUID
+	S3Experiences    []uuid.UUID
+	LocalExperiences []uuid.UUID
+	PoolLabels       api.PoolLabels
 }
 
 type tokenJSON struct {
@@ -83,12 +87,11 @@ type tokenJSON struct {
 	ExpiresIn    int32  `json:"expires_in"`
 }
 
-// Ptr takes its argument and returns a pointer to it.
-func Ptr[T any](t T) *T {
-	return &t
-}
-
 const TestProfile string = "mcb"
+
+func Ptr[T any](v T) *T {
+	return &v
+}
 
 func KnownEnvironmentVariables() []api.EnvironmentVariable {
 	return []api.EnvironmentVariable{
@@ -106,7 +109,7 @@ func ListExpectedOutputFiles(realMetrics bool) []string {
 		"experience-container.log",
 		"metrics-worker.log",
 		"metrics-container.log",
-		ExpectedExperienceNameFile,
+		ExpectedExperienceNameOutputFile,
 		ExpectedExperienceNameBase64File,
 		"test_config.json",
 		TestReRunFile,
@@ -118,7 +121,7 @@ func ListExpectedOutputFiles(realMetrics bool) []string {
 			"metrics.binproto",
 			fmt.Sprintf("metrics-%v", TestMCAPFile),
 			fmt.Sprintf("metrics-%v", TestMP4File),
-			fmt.Sprintf("metrics-%v", ExpectedExperienceNameFile),
+			fmt.Sprintf("metrics-%v", ExpectedExperienceNameOutputFile),
 			fmt.Sprintf("metrics-%v", ExpectedExperienceNameBase64File),
 			"test_config.json",
 			"test_file.txt", // from an external file metric
@@ -172,7 +175,7 @@ func NewAgentTestSuiteWithAPIClient(
 		"realm":      []string{"cli-users"},
 		"username":   []string{username},
 		"password":   []string{password},
-		"audience":   []string{audience},
+		"audience":   []string{Audience},
 		"client_id":  []string{devClientID},
 	}
 	req, _ := http.NewRequest("POST", tokenURL, strings.NewReader(payloadVals.Encode()))
@@ -209,19 +212,19 @@ func NewAgentTestSuiteWithAPIClient(
 	}
 
 	return &AgentTestSuite{
-		localExperiences: []uuid.UUID{},
-		s3Experiences:    []uuid.UUID{},
+		LocalExperiences: []uuid.UUID{},
+		S3Experiences:    []uuid.UUID{},
 		APIClient:        apiClient,
 		APIHost:          apiHost,
 		AuthHost:         authHost,
-		experienceBucket: experienceBucket,
-		poolLabels: api.PoolLabels{
+		ExperienceBucket: experienceBucket,
+		PoolLabels: api.PoolLabels{
 			poolLabel,
 		},
 	}, nil
 }
 
-func (s *AgentTestSuite) createTestProject() {
+func (s *AgentTestSuite) CreateTestProject() {
 	// Create a project:
 	createProjectRequest := api.CreateProjectInput{
 		Name:        fmt.Sprintf("Test Project %v", uuid.New()),
@@ -236,10 +239,10 @@ func (s *AgentTestSuite) createTestProject() {
 		os.Exit(1)
 	}
 	project := createProjectResponse.JSON201
-	s.projectID = project.ProjectID
+	s.ProjectID = project.ProjectID
 }
 
-func (s *AgentTestSuite) createTestSystem() {
+func (s *AgentTestSuite) CreateTestSystem() {
 	systemName := fmt.Sprintf("Test System %v", uuid.New())
 	createSystemRequest := api.CreateSystemInput{
 		Name:                       systemName,
@@ -255,18 +258,18 @@ func (s *AgentTestSuite) createTestSystem() {
 	}
 	createSystemResponse, err := s.APIClient.CreateSystemWithResponse(
 		context.Background(),
-		s.projectID,
+		s.ProjectID,
 		createSystemRequest,
 	)
 	if err != nil {
 		slog.Error("Unable to create system", "error", err)
 		os.Exit(1)
 	}
-	s.systemID = createSystemResponse.JSON201.SystemID
-	s.sharedMemoryMb = createSystemResponse.JSON201.BuildSharedMemoryMb
+	s.SystemID = createSystemResponse.JSON201.SystemID
+	s.SharedMemoryMb = createSystemResponse.JSON201.BuildSharedMemoryMb
 }
 
-func (s *AgentTestSuite) createTestBranch() {
+func (s *AgentTestSuite) CreateTestBranch() {
 	branchName := fmt.Sprintf("Test Branch %v", uuid.New())
 	createBranchRequest := api.CreateBranchInput{
 		Name:       branchName,
@@ -274,30 +277,30 @@ func (s *AgentTestSuite) createTestBranch() {
 	}
 	createBranchResponse, err := s.APIClient.CreateBranchForProjectWithResponse(
 		context.Background(),
-		s.projectID,
+		s.ProjectID,
 		createBranchRequest,
 	)
 	if err != nil {
 		slog.Error("Unable to create branch", "error", err)
 		os.Exit(1)
 	}
-	s.branchID = createBranchResponse.JSON201.BranchID
+	s.BranchID = createBranchResponse.JSON201.BranchID
 }
 
-func (s *AgentTestSuite) createBuild(imageURI string) uuid.UUID {
+func (s *AgentTestSuite) CreateBuild(imageURI string) uuid.UUID {
 	buildDescription := "description"
 	buildVersion := uuid.New().String()
 
 	createRequest := api.CreateBuildForBranchInput{
-		SystemID:    s.systemID,
+		SystemID:    s.SystemID,
 		Description: &buildDescription,
 		ImageUri:    Ptr(imageURI),
 		Version:     buildVersion,
 	}
 	createBuildResponse, err := s.APIClient.CreateBuildForBranchWithResponse(
 		context.Background(),
-		s.projectID,
-		s.branchID,
+		s.ProjectID,
+		s.BranchID,
 		createRequest,
 	)
 	if err != nil {
@@ -307,8 +310,8 @@ func (s *AgentTestSuite) createBuild(imageURI string) uuid.UUID {
 	return createBuildResponse.JSON201.BuildID
 }
 
-func (s *AgentTestSuite) createMetricsBuild() {
-	imageURI := metricsBuildURI
+func (s *AgentTestSuite) CreateMetricsBuild() {
+	imageURI := MetricsBuildURI
 	metricsBuildName := fmt.Sprintf("Test Metrics Build %v", uuid.New())
 	createMetricsBuildRequest := api.CreateMetricsBuildInput{
 		Name:     metricsBuildName,
@@ -317,53 +320,52 @@ func (s *AgentTestSuite) createMetricsBuild() {
 	}
 	createMetricsBuildResponse, err := s.APIClient.CreateMetricsBuildWithResponse(
 		context.Background(),
-		s.projectID,
+		s.ProjectID,
 		createMetricsBuildRequest,
 	)
 	if err != nil {
 		slog.Error("Unable to create metrics build", "error", err)
 		os.Exit(1)
 	}
-	s.metricsBuildID = createMetricsBuildResponse.JSON201.MetricsBuildID
+	s.MetricsBuildID = createMetricsBuildResponse.JSON201.MetricsBuildID
 }
 
-func (s *AgentTestSuite) createS3TestExperience() {
+func (s *AgentTestSuite) CreateS3TestExperience() {
 	// Create an experience:
 	experienceName := fmt.Sprintf("Test Experience %v", uuid.New())
 	// Generate a location and upload some experience files:
-	testLocation := s.generateAndUploadExperience(context.Background(), experienceName)
+	testLocations := s.GenerateAndUploadExperienceData(context.Background(), experienceName)
 
 	createExperienceRequest := api.CreateExperienceInput{
 		Name:                 experienceName,
 		Description:          "description",
-		Location:             testLocation,
+		Locations:            &testLocations,
 		Profile:              Ptr(TestProfile),
 		EnvironmentVariables: Ptr(KnownEnvironmentVariables()),
 	}
 	createExperienceResponse, err := s.APIClient.CreateExperienceWithResponse(
 		context.Background(),
-		s.projectID,
+		s.ProjectID,
 		createExperienceRequest,
 	)
 	if err != nil {
 		slog.Error("Unable to create experience", "error", err)
 		os.Exit(1)
 	}
-	s.s3Experiences = append(s.s3Experiences, createExperienceResponse.JSON201.ExperienceID)
+	s.S3Experiences = append(s.S3Experiences, createExperienceResponse.JSON201.ExperienceID)
 }
 
-func (s *AgentTestSuite) createLocalTestExperiences(containerTimeout *int32) {
+func (s *AgentTestSuite) CreateLocalTestExperiences(containerTimeout *int32) {
 	// Create an experience:
 	experienceName1 := "experience_1"
-	// experienceName2 := fmt.Sprintf("Test Experience %v", uuid.New())
 
-	testLocation1 := "/test_experience_data/experience_1/"
-	// testLocation2 := "/test_experience_data/experience_1"
+	testLocation1 := "/test_experience_data/experience_location_1/"
+	testLocation2 := "/test_experience_data/experience_location_2/experience_name.base64"
 
 	createExperienceRequest := api.CreateExperienceInput{
 		Name:                 experienceName1,
 		Description:          "description",
-		Location:             testLocation1,
+		Locations:            &[]string{testLocation1, testLocation2},
 		Profile:              Ptr(TestProfile),
 		EnvironmentVariables: Ptr(KnownEnvironmentVariables()),
 	}
@@ -373,28 +375,36 @@ func (s *AgentTestSuite) createLocalTestExperiences(containerTimeout *int32) {
 
 	createExperienceResponse, err := s.APIClient.CreateExperienceWithResponse(
 		context.Background(),
-		s.projectID,
+		s.ProjectID,
 		createExperienceRequest,
 	)
 	if err != nil {
 		slog.Error("Unable to create experience", "error", err)
 		os.Exit(1)
 	}
-	s.localExperiences = append(s.localExperiences, createExperienceResponse.JSON201.ExperienceID)
+	s.LocalExperiences = append(s.LocalExperiences, createExperienceResponse.JSON201.ExperienceID)
 }
 
-// Generates an experience and uploads it to an s3 path
-func (s *AgentTestSuite) generateAndUploadExperience(ctx context.Context, experienceName string) string {
+// Generates some experience data and uploads it to some s3 paths
+func (s *AgentTestSuite) GenerateAndUploadExperienceData(ctx context.Context, experienceName string) []string {
 	// Use the experience name to create a single file:
 	// name.experience
 	// Then also create a base64 encoded version of the name as
 	// name.base64
-	// Upload these to s3 in the test bucket:
-	// test-bucket/experiences/{uniqueID}
-	// Return the s3 path to the experience:
+	// Upload these to s3 in the e2e test bucket in two specific locations:
+	// e2e-test-bucket/experiences/location1/{uniqueID}/subdir/
+	// and
+	// e2e-test-bucket/experiences/location2/{uniqueID}
+	// Return the s3 paths to the experiences:
+	// One as a prefix, and one as a file name
 
-	testLocation := fmt.Sprintf("s3://%s/experiences/%s/", s.experienceBucket, uuid.New())
-	locationURL, err := url.Parse(testLocation)
+	experienceLocation1 := fmt.Sprintf("s3://%s/experiences/location1/%s/", s.ExperienceBucket, uuid.New())
+	experienceLocation2 := fmt.Sprintf("s3://%s/experiences/location2/%s/", s.ExperienceBucket, uuid.New())
+	uploadLocation1, err := url.Parse(fmt.Sprintf("%s%s/", experienceLocation1, ExpectedExperienceNameSubdir))
+	if err != nil {
+		log.Fatal(err)
+	}
+	uploadLocation2, err := url.Parse(experienceLocation2)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -408,12 +418,14 @@ func (s *AgentTestSuite) generateAndUploadExperience(ctx context.Context, experi
 	data := []byte(experienceName)
 	base64Name := Base64EncodeString(experienceName)
 	// Upload the data to s3:
-	uploadFile(ctx, uploader, ExpectedExperienceNameFile, locationURL, data)
-	uploadFile(ctx, uploader, ExpectedExperienceNameBase64File, locationURL, base64Name)
-	return testLocation
+	UploadFile(ctx, uploader, ExpectedExperienceNameFile, uploadLocation1, data)
+	UploadFile(ctx, uploader, ExpectedExperienceNameBase64File, uploadLocation2, base64Name)
+	// Return the s3 paths to the experiences:
+	// One as a prefix, and one as a file name
+	return []string{experienceLocation1, fmt.Sprintf("%s%s", experienceLocation2, ExpectedExperienceNameBase64File)}
 }
 
-func uploadFile(
+func UploadFile(
 	ctx context.Context,
 	uploader *manager.Uploader,
 	filename string,
@@ -446,14 +458,14 @@ func Base64EncodeString(input string) []byte {
 	return base64Input
 }
 
-func (s *AgentTestSuite) createAndAwaitBatch(buildID uuid.UUID, experiences []uuid.UUID, sharedMemoryMb int, isDocker bool, realMetrics bool) api.Batch {
+func (s *AgentTestSuite) CreateAndAwaitBatch(buildID uuid.UUID, experiences []uuid.UUID, sharedMemoryMb int, isDocker bool, realMetrics bool) api.Batch {
 	var poolLabels []string
 	if isDocker {
 		poolLabels = []string{
-			s.poolLabels[0] + "-docker",
+			s.PoolLabels[0] + "-docker",
 		}
 	} else {
-		poolLabels = s.poolLabels
+		poolLabels = s.PoolLabels
 	}
 	// Create a batch:
 	createBatchRequest := api.BatchInput{
@@ -469,12 +481,12 @@ func (s *AgentTestSuite) createAndAwaitBatch(buildID uuid.UUID, experiences []uu
 	}
 
 	if realMetrics {
-		createBatchRequest.MetricsBuildID = &s.metricsBuildID
+		createBatchRequest.MetricsBuildID = &s.MetricsBuildID
 	}
 
 	createBatchResponse, err := s.APIClient.CreateBatchWithResponse(
 		context.Background(),
-		s.projectID,
+		s.ProjectID,
 		createBatchRequest,
 	)
 	if err != nil {
@@ -486,13 +498,13 @@ func (s *AgentTestSuite) createAndAwaitBatch(buildID uuid.UUID, experiences []uu
 	s.Eventually(func() bool {
 		getResponse, err := s.APIClient.GetBatchWithResponse(
 			context.Background(),
-			s.projectID,
+			s.ProjectID,
 			*batch.BatchID,
 		)
 		s.NoError(err)
 		require.Equal(s.T(), http.StatusOK, getResponse.StatusCode(), string(getResponse.Body))
 		status := *getResponse.JSON200.Status
-		complete := isComplete(status)
+		complete := IsComplete(status)
 		if !complete {
 			s.T().Logf("Waiting for batch completion, current status: %v", status)
 		} else {
@@ -504,7 +516,7 @@ func (s *AgentTestSuite) createAndAwaitBatch(buildID uuid.UUID, experiences []uu
 	// Validate that it has SUCCEEDED:
 	getBatchResponse, err := s.APIClient.GetBatchWithResponse(
 		context.Background(),
-		s.projectID,
+		s.ProjectID,
 		*batch.BatchID,
 	)
 	s.NoError(err)
@@ -513,6 +525,6 @@ func (s *AgentTestSuite) createAndAwaitBatch(buildID uuid.UUID, experiences []uu
 	return *getBatchResponse.JSON200
 }
 
-func isComplete(status api.BatchStatus) bool {
+func IsComplete(status api.BatchStatus) bool {
 	return (status == api.BatchStatusSUCCEEDED || status == api.BatchStatusCANCELLED || status == api.BatchStatusERROR)
 }

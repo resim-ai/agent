@@ -10,6 +10,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/spf13/viper"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -47,6 +48,12 @@ const (
 	CustomerContainerAWSSourceDirKey = "aws-config-source-dir"
 	VolumeMountsKey                  = "mounts"
 	EnvVarsKey                       = "environment-variables"
+	MaxErrorCountKey                 = "max-error-count"
+	MaxErrorCountDefault             = 3
+	AgentErrorSleepKey               = "agent-error-sleep"
+	AgentErrorSleepDefault           = 5 * time.Second
+	WorkerExitSleepKey               = "worker-exit-sleep"
+	WorkerExitSleepDefault           = 30 * time.Second
 )
 
 type CustomWorkerConfig struct {
@@ -210,6 +217,15 @@ func (a *Agent) LoadConfig() error {
 			a.CustomerWorkerConfig.EnvVars = append(a.CustomerWorkerConfig.EnvVars, EnvVar{Key: envVarParts[0], Value: envVarParts[1]})
 		}
 	}
+
+	viper.SetDefault(MaxErrorCountKey, MaxErrorCountDefault)
+	a.MaxErrorCount = viper.GetInt(MaxErrorCountKey)
+
+	viper.SetDefault(AgentErrorSleepKey, AgentErrorSleepDefault)
+	a.AgentErrorSleep = viper.GetDuration(AgentErrorSleepKey)
+
+	viper.SetDefault(WorkerExitSleepKey, WorkerExitSleepDefault)
+	a.WorkerExitSleep = viper.GetDuration(WorkerExitSleepKey)
 
 	slog.Info("loaded config",
 		"apiHost", a.APIHost,

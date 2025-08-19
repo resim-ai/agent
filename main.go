@@ -6,11 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"os"
 	"os/user"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,6 +19,8 @@ import (
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
+	"github.com/google/uuid"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/resim-ai/agent/api"
@@ -26,7 +28,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const agentVersion = "v0.6.0"
+const agentVersion = "v1.0.0"
 
 type agentStatus string
 
@@ -35,13 +37,9 @@ const (
 	agentStatusStarting agentStatus = "STARTING"
 	agentStatusRunning  agentStatus = "RUNNING"
 	agentStatusError    agentStatus = "ERROR"
-)
 
-type taskStatusMessage struct {
-	Name   string
-	Status api.TaskStatus
-	Error  *api.ErrorType
-}
+	OrgIDClaim string = "https://api.resim.ai/org_id"
+)
 
 type Agent struct {
 	APIClient            *api.ClientWithResponses
@@ -57,8 +55,6 @@ type Agent struct {
 	LogDirOverride       string
 	LogLevel             string
 	Status               agentStatus
-	CurrentTaskName      string
-	CurrentTaskStatus    api.TaskStatus
 	AutoUpdate           bool
 	Privileged           bool
 	DockerNetworkMode    DockerNetworkMode
@@ -66,10 +62,17 @@ type Agent struct {
 	HostAWSConfigExists  bool
 	CustomerWorkerConfig CustomWorkerConfig
 	// For testing purposes - allows mocking the AWS config directory lookup
-	getAWSConfigDirFunc func() (string, bool)
+	getAWSConfigDirFunc    func() (string, bool)
+	ImageMutex             sync.RWMutex
+	WorkerImageURI         string
+	CurrentErrorCount      int
+	MaxErrorCount          int
+	AgentErrorSleep        time.Duration // When the agent encounters an error, it will sleep for this duration before retrying
+	WorkerExitSleep        time.Duration // After the worker exits, the agent will sleep for this duration before launching a new worker
+	OrgName                string
+	currentWorkerID        string
+	ContainerWatchInterval time.Duration // How often to check the status of the container
 }
-
-type Task api.TaskPollOutput
 
 func main() {
 	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
@@ -91,6 +94,11 @@ func main() {
 		a.LogDirOverride = LogDir
 	}
 
+	err = a.LoadConfig()
+	if err != nil {
+		slog.Error("error loading config", "err", err)
+	}
+
 	err = a.Start()
 	if err != nil {
 		os.Exit(1)
@@ -101,18 +109,15 @@ func main() {
 
 func New(dockerClient DockerClient) *Agent {
 	return &Agent{
-		Docker: dockerClient,
+		Docker:                 dockerClient,
+		ContainerWatchInterval: 2 * time.Second,
 	}
 }
 
 func (a *Agent) Start() error {
-	err := a.LoadConfig()
-	if err != nil {
-		slog.Error("error loading config", "err", err)
-		return err
-	}
+	a.getOrgName()
 
-	err = a.InitializeLogging()
+	err := a.InitializeLogging()
 	if err != nil {
 		slog.Error("error initializing logging", "err", err)
 		return err
@@ -134,100 +139,135 @@ func (a *Agent) Start() error {
 
 	slog.Info("agent initialised", "version", agentVersion, "log_level", a.LogLevel)
 
-	agentStateChan := make(chan agentStatus)
-	taskStateChan := make(chan taskStatusMessage)
-
-	go func() {
-		for {
-			select {
-			case taskStatusMessage := <-taskStateChan:
-				err := a.updateTaskStatus(ctx, taskStatusMessage.Name, taskStatusMessage.Status, taskStatusMessage.Error)
-				if err != nil {
-					slog.Error("Error updating task status", "err", err)
-				}
-			case agentStatus := <-agentStateChan:
-				a.Status = agentStatus
-			}
-		}
-	}()
-
-	agentStateChan <- agentStatusIdle
-
 	a.startHeartbeat(ctx)
 
 	err = CreateTmpResimDir()
 	if err != nil {
 		slog.Error("Error creating /tmp/resim", "err", err)
-		os.Exit(1)
+		return err
 	}
 
+	var lastPulledImage string
 	for {
-		task := a.getTask()
-		if task.TaskName == nil {
-			time.Sleep(10 * time.Second)
+		if a.CurrentErrorCount > a.MaxErrorCount {
+			slog.Error("Agent has failed too many times in a row, exiting")
+			return err
+		}
+
+		var startup api.AgentCheckinOutput
+		startup, err = a.checkin()
+		slog.Info("Received startup response from AgentAPI")
+		if err != nil {
+			slog.Error("Error checking in", "err", err)
+			err = errors.Wrap(err, fmt.Sprintf("error checking in (attempt %d)", a.CurrentErrorCount))
+			a.CurrentErrorCount++
+			time.Sleep(a.AgentErrorSleep)
 			continue
 		}
-
-		slog.Info("Got new task", "task_name", *task.TaskName)
-		// Set the current task with the agent
-		a.setCurrentTask(*task.TaskName, api.SUBMITTED)
-		taskStateChan <- taskStatusMessage{
-			Name:   *task.TaskName,
-			Status: api.SUBMITTED,
+		if startup.WorkerImageURI == nil {
+			slog.Info("Did not receive a worker image URI, sleeping for 60 seconds")
+			err = errors.New(fmt.Sprintf("no worker image URI (attempt %d)", a.CurrentErrorCount))
+			a.CurrentErrorCount++
+			time.Sleep(a.AgentErrorSleep)
+			continue
 		}
-		agentStateChan <- agentStatusRunning
-
-		// Attempt to pull the worker image; if this fails, we need to error
-		// the task.
-		err := a.pullImage(ctx, *task.WorkerImageURI)
+		if startup.WorkerEnvironmentVariables == nil {
+			slog.Error("No worker environment variables provided, cannot run worker")
+			err = errors.New(fmt.Sprintf("no worker environment variables (attempt %d)", a.CurrentErrorCount))
+			a.CurrentErrorCount++
+			time.Sleep(a.AgentErrorSleep)
+			continue
+		}
+		if startup.AuthToken == nil {
+			slog.Error("No auth token provided, cannot run worker")
+			err = errors.New(fmt.Sprintf("no auth token (attempt %d)", a.CurrentErrorCount))
+			a.CurrentErrorCount++
+			time.Sleep(a.AgentErrorSleep)
+			continue
+		}
+		workerEnvVars := []string{}
+		for _, envVar := range *startup.WorkerEnvironmentVariables {
+			workerEnvVars = append(workerEnvVars, fmt.Sprintf("%s=%s", envVar[0], envVar[1]))
+		}
+		// Attempt to pull the worker image
+		lastPulledImage, err = a.maybePullImage(ctx, lastPulledImage)
 		if err != nil {
 			slog.Error("Error pulling image", "err", err)
-			taskStateChan <- taskStatusMessage{
-				Name:   *task.TaskName,
-				Status: api.ERROR,
-				Error:  Ptr(api.AGENTERRORPULLINGWORKERIMAGE),
-			}
-			a.setCurrentTask("", "")
+			err = errors.Wrap(err, fmt.Sprintf("error pulling image (attempt %d)", a.CurrentErrorCount))
+			a.CurrentErrorCount++
+			time.Sleep(a.AgentErrorSleep)
 			continue
 		}
 
 		// Attempt to run the worker; if this fails, we need to error the task.
-		err = a.runWorker(ctx, Task(task))
+		err = a.runWorker(ctx, lastPulledImage, *startup.AuthToken, workerEnvVars)
 		if err != nil {
 			slog.Error("Error running ReSim worker", "err", err)
-			taskStateChan <- taskStatusMessage{
-				Name:   *task.TaskName,
-				Status: api.ERROR,
-				Error:  Ptr(api.AGENTERRORRUNNINGWORKER),
-			}
-			a.setCurrentTask("", "")
+			err = errors.Wrap(err, fmt.Sprintf("error running ReSim worker (attempt %d)", a.CurrentErrorCount))
+			a.CurrentErrorCount++
+			time.Sleep(a.AgentErrorSleep)
 			continue
 		}
 
-		agentStateChan <- agentStatusIdle
-
+		a.CurrentErrorCount = 0
 		if viper.GetBool(OneTaskKey) {
 			slog.Info("Agent launched in one-task mode, exiting")
 			return nil
 		}
+		time.Sleep(a.AgentErrorSleep)
 	}
 }
 
-func (a *Agent) pullImage(ctx context.Context, targetImage string) error {
-	slog.Info("Pulling image", "image", targetImage)
-	r, err := a.Docker.ImagePull(ctx, targetImage, image.PullOptions{
+func (a *Agent) getOrgName() error {
+	// decodes the org name from the token claim
+	token, err := a.Token()
+	if err != nil {
+		slog.Error("Error getting token", "err", err)
+		return err
+	}
+	claims, err := jwt.Parse([]byte(token.AccessToken), jwt.WithVerify(false))
+	if err != nil {
+		slog.Error("Error parsing token", "err", err)
+		return err
+	}
+	orgName, _ := claims.Get(OrgIDClaim)
+	if err != nil {
+		slog.Error("Error getting org claim from token", "err", err)
+		return err
+	}
+	if orgName == nil {
+		slog.Error("No org claim in token")
+		return errors.New("no org claim in token")
+	}
+	a.OrgName = orgName.(string)
+	return nil
+}
+
+// The target image URI is recorded on the agent struct already.
+// The URI passed in is the previous URI pulled. If the target image is different, it will be pulled.
+// The return value is the last URI pulled - updated if the image was pulled.
+func (a *Agent) maybePullImage(ctx context.Context, oldImage string) (string, error) {
+	a.ImageMutex.RLock()
+	defer a.ImageMutex.RUnlock()
+	if a.WorkerImageURI == oldImage {
+		slog.Info("Image already pulled", "image", oldImage)
+		return oldImage, nil
+	}
+
+	slog.Info("Pulling image", "image", a.WorkerImageURI)
+	r, err := a.Docker.ImagePull(ctx, a.WorkerImageURI, image.PullOptions{
 		Platform: "linux/amd64",
 	})
 	if err != nil {
-		return err
+		return oldImage, err
 	}
 
 	var buffer bytes.Buffer
 	io.Copy(&buffer, r)
 	r.Close()
-	slog.Info("Pulled image", "image", targetImage)
+	slog.Info("Pulled image", "image", a.WorkerImageURI)
 
-	return nil
+	return a.WorkerImageURI, nil
 }
 
 func (a *Agent) GetConfigDir() (string, error) {
@@ -248,30 +288,31 @@ func (a *Agent) GetConfigDir() (string, error) {
 	return expectedDir, nil
 }
 
-func (a *Agent) getTask() api.TaskPollOutput {
+func (a *Agent) checkin() (api.AgentCheckinOutput, error) {
 	ctx := context.Background()
 
-	pollResponse, err := a.APIClient.TaskPollWithResponse(ctx, api.TaskPollInput{
-		AgentID:    a.Name,
-		PoolLabels: a.PoolLabels,
+	pollResponse, err := a.APIClient.AgentCheckinWithResponse(ctx, api.AgentCheckinInput{
+		AgentID:      &a.Name,
+		AgentVersion: Ptr(agentVersion),
+		PoolLabels:   &a.PoolLabels,
 	})
 	if err != nil {
-		slog.Error("Error polling for task", "err", err)
+		slog.Error("Error checking in", "err", err)
+		return api.AgentCheckinOutput{}, err
 	}
 
-	switch pollResponse.StatusCode() {
-	case 204:
-		slog.Debug("No task available")
-		return api.TaskPollOutput{}
-	case 200:
-		task := pollResponse.JSON200
-		slog.Info("Received task", "task-name", *task.TaskName)
-		return *task
-	default:
+	if pollResponse.StatusCode() != 200 {
 		slog.Error("error polling for task", "err", pollResponse.StatusCode())
+		return api.AgentCheckinOutput{}, errors.New("error polling for task")
 	}
 
-	return api.TaskPollOutput{}
+	a.ImageMutex.Lock()
+	defer a.ImageMutex.Unlock()
+	if pollResponse.JSON200.WorkerImageURI != nil {
+		a.WorkerImageURI = *pollResponse.JSON200.WorkerImageURI
+	}
+	// TODO: handle forced agent update
+	return *pollResponse.JSON200, nil
 }
 
 func StringifyEnvironmentVariables(inputVars [][]string) []string {
@@ -283,18 +324,23 @@ func StringifyEnvironmentVariables(inputVars [][]string) []string {
 	return envVars
 }
 
-func (a *Agent) runWorker(ctx context.Context, task Task) error {
-	providedEnvVars := StringifyEnvironmentVariables(*task.WorkerEnvironmentVariables)
-	extraEnvVars := []string{
+func (a *Agent) getWorkerID() string {
+	return fmt.Sprintf("agent-%s|%s|%s", a.OrgName, a.Name, a.currentWorkerID)
+}
+
+func (a *Agent) runWorker(ctx context.Context, imageURI string, workerToken string, workerEnvVars []string) error {
+	a.currentWorkerID = uuid.New().String() // assign a new workerID for tracking purposes every time
+	providedEnvVars := []string{
 		"RERUN_WORKER_ENVIRONMENT=dev",
+		"RERUN_WORKER_REUSABLE=true",
 		fmt.Sprintf("RERUN_WORKER_DOCKER_NETWORK_MODE=%v", a.DockerNetworkMode),
-		fmt.Sprintf("RERUN_WORKER_CONTAINER_TIMEOUT=%v", task.ContainerTimeout),
-		fmt.Sprintf("RERUN_WORKER_WORKER_ID=%v", *task.TaskName), // This is the task name, which is the same as the worker ID for internal workloads.
+		fmt.Sprintf("RERUN_WORKER_WORKER_ID=%v", a.getWorkerID()),
 	}
 	if a.Privileged {
-		extraEnvVars = append(extraEnvVars, "RERUN_WORKER_PRIVILEGED=true")
+		providedEnvVars = append(providedEnvVars, "RERUN_WORKER_PRIVILEGED=true")
 	}
-
+	providedEnvVars = append(providedEnvVars, workerEnvVars...)
+	providedEnvVars = append(providedEnvVars, fmt.Sprintf("RERUN_WORKER_POOL_LABELS=%v", strings.Join(a.PoolLabels, ",")))
 	// convert the custom worker config to json string:
 	customWorkerConfigJSON, err := json.Marshal(a.CustomerWorkerConfig)
 	if err != nil {
@@ -302,7 +348,7 @@ func (a *Agent) runWorker(ctx context.Context, task Task) error {
 		return err
 	}
 	slog.Info("Custom worker config", "config", string(customWorkerConfigJSON))
-	extraEnvVars = append(extraEnvVars, "RERUN_WORKER_CUSTOM_WORKER_CONFIG="+string(customWorkerConfigJSON))
+	providedEnvVars = append(providedEnvVars, "RERUN_WORKER_CUSTOM_WORKER_CONFIG="+string(customWorkerConfigJSON))
 
 	var homeDir string
 	user, err := user.Current()
@@ -320,8 +366,8 @@ func (a *Agent) runWorker(ctx context.Context, task Task) error {
 	}
 
 	config := &container.Config{
-		Image: *task.WorkerImageURI,
-		Env:   append(providedEnvVars, extraEnvVars...),
+		Image: imageURI,
+		Env:   providedEnvVars,
 	}
 
 	hostConfig := &container.HostConfig{
@@ -352,53 +398,45 @@ func (a *Agent) runWorker(ctx context.Context, task Task) error {
 		})
 	}
 
-	slog.Info("About to print environment variables")
-
-	for _, envVar := range config.Env {
-		slog.Info("Environment variable", "name", envVar)
-	}
-
 	res, err := a.Docker.ContainerCreate(
 		context.TODO(),
 		config,
 		hostConfig,
 		&network.NetworkingConfig{},
 		&v1.Platform{},
-		*task.TaskName,
+		fmt.Sprintf("worker-%s", a.currentWorkerID),
 	)
 	if err != nil {
 		// Try to remove container and volumes if there is an error:
 		a.removeContainer(ctx, res.ID)
-		return errors.Wrapf(err, "error creating container for task %s", *task.TaskName)
+		return errors.Wrap(err, "error creating container for worker")
 	}
 
 	err = a.Docker.ContainerStart(ctx, res.ID, container.StartOptions{})
 	if err != nil {
 		// Try to remove container and volumes if there is an error:
 		a.removeContainer(ctx, res.ID)
-		return errors.Wrapf(err, "error starting container for task %s", *task.TaskName)
+		return errors.Wrap(err, "error starting container for worker")
 	}
-	slog.Info("Container for task starting", "task", *task.TaskName)
+	slog.Info("Container for worker starting", "worker", a.currentWorkerID)
 	// From now one, the worker is responsible for updating its own status.
-	a.setCurrentTask(*task.TaskName, api.RUNNING)
 	for {
 		status, err := a.Docker.ContainerInspect(ctx, res.ID)
 		if err != nil {
-			a.setCurrentTask("", "")
-			return errors.Wrapf(err, "error inspecting container for task %s", *task.TaskName)
+			return errors.Wrap(err, "error inspecting container for worker")
 		}
 		if status.State.Status != "running" {
 			if status.State.ExitCode == 0 {
-				slog.Info("Container for task succeeded", "task", *task.TaskName)
+				slog.Info("Worker succeeded")
 			} else {
-				slog.Info("Container exited non-zero", "task", *task.TaskName, "exit_code", status.State.ExitCode, "err", status.State.Error)
+				slog.Info("Worker container exited non-zero", "exit_code", status.State.ExitCode, "err", status.State.Error)
 			}
-			a.setCurrentTask("", "")
+			time.Sleep(a.WorkerExitSleep)
 			break
 		} else {
-			slog.Info("Container is running", "task", *task.TaskName)
+			slog.Info("Worker is running")
 		}
-		time.Sleep(2 * time.Second)
+		time.Sleep(a.ContainerWatchInterval)
 	}
 
 	// Remove container and volumes:
@@ -420,66 +458,15 @@ func Ptr[T any](t T) *T {
 }
 
 func (a *Agent) startHeartbeat(ctx context.Context) error {
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(60 * time.Second)
 
 	go func() {
 		for range ticker.C {
-
-			hbInput := api.AgentHeartbeatInput{
-				AgentName:  &a.Name,
-				PoolLabels: &a.PoolLabels,
-			}
-
-			// If we have a task, send the task name and status in the heartbeat,
-			// taking care not to use a direct pointer to the values, as they may be
-			// updated by the main loop, but not here.
-			if a.CurrentTaskName != "" {
-				currentTaskName := a.CurrentTaskName
-				hbInput.TaskName = &currentTaskName
-			}
-			if a.CurrentTaskStatus != "" {
-				currentTaskStatus := a.CurrentTaskStatus
-				hbInput.TaskStatus = &currentTaskStatus
-			}
-
-			_, err := a.APIClient.AgentHeartbeat(ctx, hbInput)
-			if err != nil {
-				log.Fatal(err)
-			}
+			a.checkin()
 		}
 	}()
 
 	return nil
-}
-
-func (a *Agent) updateTaskStatus(ctx context.Context, taskName string, status api.TaskStatus, error *api.ErrorType) error {
-	slog.Info("Updating task status", "task_name", taskName, "status", status)
-
-	updateTaskInput := api.UpdateTaskInput{
-		Status: &status,
-	}
-	if error != nil {
-		updateTaskInput.ErrorType = error
-	}
-	response, err := a.APIClient.UpdateTask(ctx, taskName, updateTaskInput)
-	if err != nil {
-		slog.Error("Error updating task status", "err", err)
-		return err
-	}
-
-	if response.StatusCode != 200 {
-		slog.Error("Received non-200 response from API when updating task status", "err", response.StatusCode)
-		return fmt.Errorf("error updating task status: %v", response.Status)
-	}
-
-	slog.Info("Task status updated", "task_name", taskName, "status", status)
-	return nil
-}
-
-func (a *Agent) setCurrentTask(taskName string, status api.TaskStatus) {
-	slog.Info("Setting current task", "task_name", taskName, "status", status)
-	a.CurrentTaskName = taskName
-	a.CurrentTaskStatus = status
 }
 
 func CreateTmpResimDir() error {
