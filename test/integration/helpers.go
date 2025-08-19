@@ -30,7 +30,6 @@ import (
 
 const (
 	// A pair of constants used for creating actual experience data for test experiences
-	// UnTouch
 	ExpectedExperienceNameFile       string = "experience_name.txt"
 	ExpectedExperienceNameBase64File string = "experience_name.base64"
 	ExpectedExperienceNameOutputFile string = "ExperienceName.zip"

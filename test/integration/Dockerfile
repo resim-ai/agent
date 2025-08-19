@@ -1,5 +1,4 @@
 # Dockerfile to create a customer image with local experience data
-# ARG TEST_BUILD_TAG
 
 FROM 909785973729.dkr.ecr.us-east-1.amazonaws.com/rerun-end-to-end-test-experience-build:latest
 
