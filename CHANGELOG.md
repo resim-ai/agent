@@ -4,6 +4,10 @@
 
 Changes and release notes for the ReSim agent
 
+## v1.0.1 - 2025-09-16
+
+- Agent will now clean up the worker directory (`/tmp/resim`) if the worker exits abnormally. The worker typically does this itself, but this covers times when the worker cannot. This can be turned off with a config option if the contents are needed for debugging.
+
 ## v1.0.0 - 2025-08-18
 
 - Simplifies the operation of the agent; it is now a wrapper for fetching and executing the worker, which handles the sourcing and management of work. This will result in functionality more consistent with the ReSim cloud environment.
