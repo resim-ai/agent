@@ -54,6 +54,8 @@ const (
 	AgentErrorSleepDefault           = 5 * time.Second
 	WorkerExitSleepKey               = "worker-exit-sleep"
 	WorkerExitSleepDefault           = 30 * time.Second
+	CleanWorkerDirKey                = "clean-worker-dir"
+	CleanWorkerDirDefault            = true
 )
 
 type CustomWorkerConfig struct {
@@ -226,6 +228,9 @@ func (a *Agent) LoadConfig() error {
 
 	viper.SetDefault(WorkerExitSleepKey, WorkerExitSleepDefault)
 	a.WorkerExitSleep = viper.GetDuration(WorkerExitSleepKey)
+
+	viper.SetDefault(CleanWorkerDirKey, CleanWorkerDirDefault)
+	a.CleanWorkerDir = viper.GetBool(CleanWorkerDirKey)
 
 	slog.Info("loaded config",
 		"apiHost", a.APIHost,
