@@ -43,7 +43,7 @@ const (
 	TestMCAPFile      string = "test.mcap"
 	TestMP4File       string = "test.mp4"
 	TestReRunFile     string = "test.rrd"
-	TestEmissionsFile string = "emissions.ndjson"
+	TestEmissionsFile string = "emissions.resim.jsonl"
 
 	ApiCheckTimeout  = 10 * time.Minute
 	ApiCheckInterval = 10 * time.Second
