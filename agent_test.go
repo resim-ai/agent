@@ -452,7 +452,10 @@ func (s *AgentTestSuite) TestStart_RunWorkerError() {
 	err = s.agent.Start()
 	s.ErrorContains(err, "error running ReSim worker (attempt 3)")
 	s.ErrorContains(err, "containercreate error")
-	s.NoDirExists(s.agent.WorkerDir)
+	// The directory exists but should be empty
+	files, err := os.ReadDir(s.agent.WorkerDir)
+	s.NoError(err)
+	s.Empty(files)
 }
 
 func (s *AgentTestSuite) TestStart_RunWorkerError_NoCleanup() {
@@ -461,7 +464,7 @@ func (s *AgentTestSuite) TestStart_RunWorkerError_NoCleanup() {
 	err := s.agent.LoadConfig()
 	s.NoError(err)
 
-	s.agent.CleanWorkerDir = false
+	s.agent.RemoveWorkerDir = false
 
 	s.mockDocker.On("ImagePull", mock.Anything, mock.Anything, mock.Anything).Return(io.NopCloser(strings.NewReader("thing")), nil)
 

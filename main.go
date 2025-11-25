@@ -70,7 +70,8 @@ type Agent struct {
 	currentWorkerID        string
 	ContainerWatchInterval time.Duration // How often to check the status of the container
 	WorkerDir              string        // The directory to store the worker directory
-	CleanWorkerDir         bool          // Whether to clean the worker directory after the worker exits abnormally
+	RemoveWorkerDir        bool          // Whether to remove the worker directory after the worker exits abnormally
+	RemoveExperienceCache  bool          // Whether to remove the experience cache directory on agent exit
 }
 
 func main() {
@@ -99,6 +100,9 @@ func main() {
 	}
 
 	err = a.Start()
+	if a.RemoveExperienceCache {
+		a.DeleteExperienceCache()
+	}
 	if err != nil {
 		os.Exit(1)
 	} else {
@@ -151,8 +155,8 @@ func (a *Agent) Start() error {
 	for {
 		if a.CurrentErrorCount > a.MaxErrorCount {
 			slog.Error("Agent has failed too many times in a row, exiting")
-			if a.CleanWorkerDir {
-				DeleteWorkerDir(a.WorkerDir)
+			if a.RemoveWorkerDir {
+				_ = a.DeleteWorkerDir()
 			}
 			return err
 		}
@@ -484,12 +488,31 @@ func CreateWorkerDir(dir string) error {
 	return nil
 }
 
-func DeleteWorkerDir(dir string) error {
-	err := os.RemoveAll(dir)
+func (a *Agent) DeleteWorkerDir() error {
+	// Delete each directory in the worker directory, recursively:
+	subpaths, err := os.ReadDir(a.WorkerDir)
 	if err != nil {
 		return err
 	}
-	return nil
+	for _, subpath := range subpaths {
+		if subpath.Name() == "cache" {
+			continue
+		}
+		removePath := filepath.Join(a.WorkerDir, subpath.Name())
+		err = os.RemoveAll(removePath)
+		if err != nil {
+			slog.Warn("Error while deleting worker directory", "error", err, "path", removePath)
+		}
+	}
+	return err
+}
+
+func (a *Agent) DeleteExperienceCache() {
+	cacheDir := filepath.Join(a.WorkerDir, "cache")
+	err := os.RemoveAll(cacheDir)
+	if err != nil {
+		slog.Warn("Error while deleting experience cache", "error", err, "path", cacheDir)
+	}
 }
 
 func (a *Agent) getAPIClient(ctx context.Context) (*api.ClientWithResponses, error) {
