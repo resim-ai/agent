@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -28,17 +29,13 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const agentVersion = "v1.0.0"
+const agentVersion = "v1.0.1"
 
 type agentStatus string
 
 const (
-	agentStatusIdle     agentStatus = "IDLE"
-	agentStatusStarting agentStatus = "STARTING"
-	agentStatusRunning  agentStatus = "RUNNING"
-	agentStatusError    agentStatus = "ERROR"
-
 	OrgIDClaim string = "https://api.resim.ai/org_id"
+	TmpResim   string = "/tmp/resim"
 )
 
 type Agent struct {
@@ -72,6 +69,9 @@ type Agent struct {
 	OrgName                string
 	currentWorkerID        string
 	ContainerWatchInterval time.Duration // How often to check the status of the container
+	WorkerDir              string        // The directory to store the worker directory
+	RemoveWorkerDir        bool          // Whether to remove the worker directory after the worker exits abnormally
+	RemoveExperienceCache  bool          // Whether to remove the experience cache directory on agent exit
 }
 
 func main() {
@@ -100,6 +100,9 @@ func main() {
 	}
 
 	err = a.Start()
+	if a.RemoveExperienceCache {
+		a.DeleteExperienceCache()
+	}
 	if err != nil {
 		os.Exit(1)
 	} else {
@@ -111,6 +114,7 @@ func New(dockerClient DockerClient) *Agent {
 	return &Agent{
 		Docker:                 dockerClient,
 		ContainerWatchInterval: 2 * time.Second,
+		WorkerDir:              TmpResim,
 	}
 }
 
@@ -139,9 +143,9 @@ func (a *Agent) Start() error {
 
 	slog.Info("agent initialised", "version", agentVersion, "log_level", a.LogLevel)
 
-	a.startHeartbeat(ctx)
+	a.startHeartbeat()
 
-	err = CreateTmpResimDir()
+	err = CreateWorkerDir(a.WorkerDir)
 	if err != nil {
 		slog.Error("Error creating /tmp/resim", "err", err)
 		return err
@@ -151,6 +155,9 @@ func (a *Agent) Start() error {
 	for {
 		if a.CurrentErrorCount > a.MaxErrorCount {
 			slog.Error("Agent has failed too many times in a row, exiting")
+			if a.RemoveWorkerDir {
+				_ = a.DeleteWorkerDir()
+			}
 			return err
 		}
 
@@ -200,7 +207,7 @@ func (a *Agent) Start() error {
 		}
 
 		// Attempt to run the worker; if this fails, we need to error the task.
-		err = a.runWorker(ctx, lastPulledImage, *startup.AuthToken, workerEnvVars)
+		err = a.runWorker(ctx, lastPulledImage, workerEnvVars)
 		if err != nil {
 			slog.Error("Error running ReSim worker", "err", err)
 			err = errors.Wrap(err, fmt.Sprintf("error running ReSim worker (attempt %d)", a.CurrentErrorCount))
@@ -328,7 +335,7 @@ func (a *Agent) getWorkerID() string {
 	return fmt.Sprintf("agent-%s|%s|%s", a.OrgName, a.Name, a.currentWorkerID)
 }
 
-func (a *Agent) runWorker(ctx context.Context, imageURI string, workerToken string, workerEnvVars []string) error {
+func (a *Agent) runWorker(ctx context.Context, imageURI string, workerEnvVars []string) error {
 	a.currentWorkerID = uuid.New().String() // assign a new workerID for tracking purposes every time
 	providedEnvVars := []string{
 		"RERUN_WORKER_ENVIRONMENT=dev",
@@ -349,6 +356,7 @@ func (a *Agent) runWorker(ctx context.Context, imageURI string, workerToken stri
 	}
 	slog.Info("Custom worker config", "config", string(customWorkerConfigJSON))
 	providedEnvVars = append(providedEnvVars, "RERUN_WORKER_CUSTOM_WORKER_CONFIG="+string(customWorkerConfigJSON))
+	providedEnvVars = append(providedEnvVars, "RERUN_WORKER_WORKER_TYPE=agent")
 
 	var homeDir string
 	user, err := user.Current()
@@ -430,6 +438,7 @@ func (a *Agent) runWorker(ctx context.Context, imageURI string, workerToken stri
 				slog.Info("Worker succeeded")
 			} else {
 				slog.Info("Worker container exited non-zero", "exit_code", status.State.ExitCode, "err", status.State.Error)
+
 			}
 			time.Sleep(a.WorkerExitSleep)
 			break
@@ -457,7 +466,7 @@ func Ptr[T any](t T) *T {
 	return &t
 }
 
-func (a *Agent) startHeartbeat(ctx context.Context) error {
+func (a *Agent) startHeartbeat() error {
 	ticker := time.NewTicker(60 * time.Second)
 
 	go func() {
@@ -469,8 +478,7 @@ func (a *Agent) startHeartbeat(ctx context.Context) error {
 	return nil
 }
 
-func CreateTmpResimDir() error {
-	dir := "/tmp/resim"
+func CreateWorkerDir(dir string) error {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		err := os.Mkdir(dir, 0o700)
 		if err != nil {
@@ -480,12 +488,51 @@ func CreateTmpResimDir() error {
 	return nil
 }
 
+func (a *Agent) DeleteWorkerDir() error {
+	// Delete each directory in the worker directory, recursively:
+	subpaths, err := os.ReadDir(a.WorkerDir)
+	if err != nil {
+		return err
+	}
+	for _, subpath := range subpaths {
+		if subpath.Name() == "cache" {
+			continue
+		}
+		removePath := filepath.Join(a.WorkerDir, subpath.Name())
+		err = os.RemoveAll(removePath)
+		if err != nil {
+			slog.Warn("Error while deleting worker directory", "error", err, "path", removePath)
+		}
+	}
+	return err
+}
+
+func (a *Agent) DeleteExperienceCache() {
+	cacheDir := filepath.Join(a.WorkerDir, "cache")
+	err := os.RemoveAll(cacheDir)
+	if err != nil {
+		slog.Warn("Error while deleting experience cache", "error", err, "path", cacheDir)
+	}
+}
+
 func (a *Agent) getAPIClient(ctx context.Context) (*api.ClientWithResponses, error) {
 	oauthClient := oauth2.NewClient(ctx, a)
-	APIClient, err := api.NewClientWithResponses(a.APIHost, api.WithHTTPClient(oauthClient))
+	APIClient, err := api.NewClientWithResponses(
+		a.APIHost,
+		api.WithHTTPClient(oauthClient),
+		api.WithRequestEditorFn(AddAgentIDEditor(a.Name, agentVersion)),
+	)
 	if err != nil {
 		return &api.ClientWithResponses{}, err
 	}
 
 	return APIClient, nil
+}
+
+func AddAgentIDEditor(agentID string, agentVersion string) api.RequestEditorFn {
+	return func(ctx context.Context, req *http.Request) error {
+		req.Header.Set("X-ReSim-AgentID", agentID)
+		req.Header.Set("X-ReSim-AgentVersion", agentVersion)
+		return nil
+	}
 }

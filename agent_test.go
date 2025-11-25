@@ -60,6 +60,11 @@ func TestAgentSuite(s *testing.T) {
 func (s *AgentTestSuite) SetupTest() {
 	s.mockDocker = &MockDockerClient{}
 	s.agent = New(s.mockDocker)
+	var err error
+	s.agent.WorkerDir, err = os.MkdirTemp("", "test-worker-dir-*")
+	if err != nil {
+		s.FailNow("error creating worker dir", err)
+	}
 	s.agent.Name = DefaultTestAgentName
 	s.agent.ContainerWatchInterval = 1 * time.Millisecond
 	s.agent.AgentErrorSleep = 1 * time.Millisecond
@@ -90,6 +95,9 @@ func (s *AgentTestSuite) TearDownTest() {
 	os.Unsetenv("RESIM_AGENT_ONE_TASK")
 	os.Unsetenv("RESIM_AGENT_AGENT_ERROR_SLEEP")
 	os.Unsetenv("RESIM_AGENT_WORKER_EXIT_SLEEP")
+	if s.agent.WorkerDir != "" {
+		os.RemoveAll(s.agent.WorkerDir)
+	}
 }
 
 func (s *AgentTestSuite) createConfigFile() string {
@@ -301,6 +309,7 @@ func (s *AgentTestSuite) TestDefaultAgentDockerModes() {
 	err = s.agent.Start()
 	s.NoError(err)
 
+	s.DirExists(s.agent.WorkerDir)
 	// check the agent is running in privileged mode
 	s.Equal(false, s.agent.Privileged)
 	// check the agent uses the default bridge network mode
@@ -443,6 +452,32 @@ func (s *AgentTestSuite) TestStart_RunWorkerError() {
 	err = s.agent.Start()
 	s.ErrorContains(err, "error running ReSim worker (attempt 3)")
 	s.ErrorContains(err, "containercreate error")
+	// The directory exists but should be empty
+	files, err := os.ReadDir(s.agent.WorkerDir)
+	s.NoError(err)
+	s.Empty(files)
+}
+
+func (s *AgentTestSuite) TestStart_RunWorkerError_NoCleanup() {
+	s.agent.ConfigDirOverride = s.createConfigFile()
+
+	err := s.agent.LoadConfig()
+	s.NoError(err)
+
+	s.agent.RemoveWorkerDir = false
+
+	s.mockDocker.On("ImagePull", mock.Anything, mock.Anything, mock.Anything).Return(io.NopCloser(strings.NewReader("thing")), nil)
+
+	s.mockDocker.On("ContainerCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(container.CreateResponse{
+		ID: "container-id",
+	}, errors.New("containercreate error"))
+
+	s.mockDocker.On("ContainerRemove", mock.Anything, "container-id", mock.Anything).Return(nil)
+
+	err = s.agent.Start()
+	s.ErrorContains(err, "error running ReSim worker (attempt 3)")
+	s.ErrorContains(err, "containercreate error")
+	s.DirExists(s.agent.WorkerDir)
 }
 
 func (s *AgentTestSuite) TestGetOrgName() {
