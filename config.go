@@ -58,6 +58,8 @@ const (
 	RemoveWorkerDirDefault           = true
 	RemoveExperienceCacheKey         = "remove-experience-cache"
 	RemoveExperienceCacheDefault     = false
+	ExperienceCacheDirKey            = "experience-cache-dir"
+	ExperienceCacheDirDefault        = "/tmp/resim/cache"
 )
 
 type CustomWorkerConfig struct {
@@ -236,6 +238,9 @@ func (a *Agent) LoadConfig() error {
 
 	viper.SetDefault(RemoveExperienceCacheKey, RemoveExperienceCacheDefault)
 	a.RemoveExperienceCache = viper.GetBool(RemoveExperienceCacheKey)
+
+	viper.SetDefault(ExperienceCacheDirKey, ExperienceCacheDirDefault)
+	a.ExperienceCacheDir = viper.GetString(ExperienceCacheDirKey)
 
 	slog.Info("loaded config",
 		"apiHost", a.APIHost,

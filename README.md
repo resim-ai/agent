@@ -52,9 +52,11 @@ aws-config-destination-dir: /home/ubuntu/.aws (for example)
 # If you would like to override that behaviour and mount a specific directory, set aws-config-source-dir
 # Note that the initialisation of the worker will still use the AWS config of the agent user, so you can use different profiles at initialisation and runtime
 aws-config-source-dir: /home/aws-configs/dev/.aws (for example)
+# Experience cache directory (default: /tmp/resim/cache) - the directory to store the experience cache
+experience-cache-dir: /tmp/resim/cache
 # Remove the worker directory (default: true) - Clean up /tmp/resim/... when the worker exits abnormally
 remove-worker-dir: true
-# Remove the experience cache directory (default: false) - Clean up /tmp/resim/cache when the agent exits
+# Remove the experience cache directory (default: false) - Clean up experience-cache-dir when the agent exits
 remove-experience-cache: false
 
 # Add any mounts that you wish to pass to your build e.g. volumes or sockets
