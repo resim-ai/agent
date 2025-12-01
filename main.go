@@ -494,11 +494,9 @@ func (a *Agent) startHeartbeat() error {
 }
 
 func CreateDir(dir string) error {
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		err := os.Mkdir(dir, 0o700)
-		if err != nil {
-			return err
-		}
+	err := os.MkdirAll(dir, 0o700)
+	if err != nil {
+		return err
 	}
 	return nil
 }
