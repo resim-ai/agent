@@ -333,6 +333,7 @@ func (s *AgentTestSuite) TestDefaultAgentDockerModes() {
 			{Key: "REPUNS_ENABLED", Value: "true"},
 			{Key: "CAFFEINE_LEVEL", Value: "zero"},
 		},
+		CacheDir: "/tmp/resim/cache",
 	}
 	s.Equal(expectedCustomConfig, customConfig)
 	// validate the components of the workerID from the env var

@@ -34,25 +34,42 @@ the image locally or is authenticated to the appropriate registry.
 
 Note that the ReSim app actively validates the image tag, so you need to have a full registry path.
 
-You will also need to obtain the password for the `e2e.resim.ai` account by [following these
-instructions](https://github.com/resim-ai/tf-auth0#agent-users). Note, this is a private repository.
+You will also need to obtain the [Agent password](https://github.com/resim-ai/tf-auth0#agent-users) & [CLI password](https://github.com/resim-ai/tf-auth0#cli-users) for the `e2e.resim.ai` account by following the linked instructions. Note, this is a private repository.
+
+Set up the agent config file:
+```yaml
+name: <unique-name>
+pool-labels:
+  - <unique-label>
+username: e2e.resim.ai
+password: <agent password>
+api-host: https://agentapi.resim.io/agent/v1
+auth-host: https://resim-dev.us.auth0.com
+environment-variables:
+  - THIS_IS_A=test
+  - AGENT=true
+mounts:
+  - /tmp/blah:/tmp/agent/resim
+```
 
 Set the following environment variables:
 
 ```shell
-AWS_PROFILE=rerun_dev
-AWS_REGION=us-east-1
-AGENT_TEST_NAME=<any_arbitrary_name>
-AGENT_TEST_POOL_LABELS=<your_unique_pool_label>
-AGENT_TEST_API_HOST=https://dev-env-pr-<your rerun PR>.api.dev.resim.io/v1/
-AGENT_TEST_USERNAME=cli+e2e.resim.ai@resim.ai
-AGENT_TEST_AUTH_HOST=https://resim-dev.us.auth0.com
-AGENT_TEST_EXPERIENCE_BUCKET=dev-dev-env-pr-<your rerun PR>-experiences
-AGENT_TEST_PASSWORD=<the_password_you_obtained>
-AGENT_TEST_LOCAL_IMAGE=<your_test_build_image>
+export AWS_PROFILE=rerun_dev \
+AWS_REGION=us-east-1 \
+AGENT_TEST_NAME=<unique-name> \
+AGENT_TEST_POOL_LABELS=<unique-label> \
+AGENT_TEST_API_HOST=https://api.resim.io/v1/ \
+AGENT_TEST_USERNAME=cli+e2e.resim.ai@resim.ai \
+AGENT_TEST_AUTH_HOST=https://resim-dev.us.auth0.com \
+AGENT_TEST_EXPERIENCE_BUCKET=<valid-bucket-name> \
+AGENT_TEST_PASSWORD=<cli password> \
+AGENT_TEST_LOCAL_IMAGE=909785973729.dkr.ecr.us-east-1.amazonaws.com/agent-test:<valid-image-tag>
 ```
 
-Then run the following in a different terminal, and wait:
+Then run the tests:
+
+Note: unless you run the dockerized agent too, the `TestDockerAgentWithS3Experience` test will fail.
 
 ```shell
 go test -v ./test/integration

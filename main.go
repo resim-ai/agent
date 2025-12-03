@@ -29,7 +29,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const agentVersion = "v1.0.1"
+const agentVersion = "v1.1.0"
 
 type agentStatus string
 
@@ -72,6 +72,7 @@ type Agent struct {
 	WorkerDir              string        // The directory to store the worker directory
 	RemoveWorkerDir        bool          // Whether to remove the worker directory after the worker exits abnormally
 	RemoveExperienceCache  bool          // Whether to remove the experience cache directory on agent exit
+	ExperienceCacheDir     string        // The directory to store the experience cache
 }
 
 func main() {
@@ -145,9 +146,16 @@ func (a *Agent) Start() error {
 
 	a.startHeartbeat()
 
-	err = CreateWorkerDir(a.WorkerDir)
+	err = CreateDir(a.WorkerDir)
 	if err != nil {
 		slog.Error("Error creating /tmp/resim", "err", err)
+		return err
+	}
+
+	// Create the experience cache directory if it doesn't exist
+	err = CreateDir(a.ExperienceCacheDir)
+	if err != nil {
+		slog.Error("Error creating experience cache directory", "err", err, "path", a.ExperienceCacheDir)
 		return err
 	}
 
@@ -406,6 +414,13 @@ func (a *Agent) runWorker(ctx context.Context, imageURI string, workerEnvVars []
 		})
 	}
 
+	// Mount the experience cache directory
+	hostConfig.Mounts = append(hostConfig.Mounts, mount.Mount{
+		Type:   mount.TypeBind,
+		Source: a.ExperienceCacheDir,
+		Target: "/tmp/resim/cache",
+	})
+
 	res, err := a.Docker.ContainerCreate(
 		context.TODO(),
 		config,
@@ -478,12 +493,10 @@ func (a *Agent) startHeartbeat() error {
 	return nil
 }
 
-func CreateWorkerDir(dir string) error {
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		err := os.Mkdir(dir, 0o700)
-		if err != nil {
-			return err
-		}
+func CreateDir(dir string) error {
+	err := os.MkdirAll(dir, 0o700)
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -508,10 +521,9 @@ func (a *Agent) DeleteWorkerDir() error {
 }
 
 func (a *Agent) DeleteExperienceCache() {
-	cacheDir := filepath.Join(a.WorkerDir, "cache")
-	err := os.RemoveAll(cacheDir)
+	err := os.RemoveAll(a.ExperienceCacheDir)
 	if err != nil {
-		slog.Warn("Error while deleting experience cache", "error", err, "path", cacheDir)
+		slog.Warn("Error while deleting experience cache", "error", err, "path", a.ExperienceCacheDir)
 	}
 }
 

@@ -58,11 +58,14 @@ const (
 	RemoveWorkerDirDefault           = true
 	RemoveExperienceCacheKey         = "remove-experience-cache"
 	RemoveExperienceCacheDefault     = false
+	ExperienceCacheDirKey            = "experience-cache-dir"
+	ExperienceCacheDirDefault        = "/tmp/resim/cache"
 )
 
 type CustomWorkerConfig struct {
-	Mounts  []Mount  `json:"mounts"`
-	EnvVars []EnvVar `json:"envvars"`
+	Mounts   []Mount  `json:"mounts"`
+	EnvVars  []EnvVar `json:"envvars"`
+	CacheDir string   `json:"cache_dir"`
 }
 
 type Mount struct {
@@ -237,6 +240,10 @@ func (a *Agent) LoadConfig() error {
 	viper.SetDefault(RemoveExperienceCacheKey, RemoveExperienceCacheDefault)
 	a.RemoveExperienceCache = viper.GetBool(RemoveExperienceCacheKey)
 
+	viper.SetDefault(ExperienceCacheDirKey, ExperienceCacheDirDefault)
+	a.ExperienceCacheDir = viper.GetString(ExperienceCacheDirKey)
+	a.CustomerWorkerConfig.CacheDir = viper.GetString(ExperienceCacheDirKey)
+
 	slog.Info("loaded config",
 		"apiHost", a.APIHost,
 		"authHost", a.AuthHost,
@@ -246,6 +253,7 @@ func (a *Agent) LoadConfig() error {
 		"dockerNetworkMode", a.DockerNetworkMode,
 		"mounts", a.CustomerWorkerConfig.Mounts,
 		"envVars", a.CustomerWorkerConfig.EnvVars,
+		"cacheDir", a.CustomerWorkerConfig.CacheDir,
 		"one_task", viper.GetBool(OneTaskKey),
 	)
 
