@@ -105,6 +105,7 @@ func ListExpectedOutputFiles(realMetrics bool) []string {
 		TestMCAPFile,
 		TestMP4File,
 		"resource_metrics.binproto",
+		"resource_metrics.resim.jsonl",
 		"experience-worker.log",
 		"experience-container.log",
 		"metrics-worker.log",
