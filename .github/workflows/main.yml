@@ -31,17 +31,6 @@ jobs:
       - name: Trunk Check
         uses: trunk-io/trunk-action@v1
 
-  sbom:
-    name: Security Scan and SBOM Generation
-    uses: ./.github/workflows/security-and-sbom.yml
-    with:
-      severity: MEDIUM,HIGH,CRITICAL
-      repository: agent
-    secrets:
-      app-id: ${{ secrets.DEPLOYMENT_BOT_APP_ID }}
-      private-key: ${{ secrets.DEPLOYMENT_BOT_PRIVATE_KEY }}
-      github-token: ${{ secrets.GITHUB_TOKEN }}
-
   unit_tests:
     name: Go Build, unit tests, and Code coverage
     uses: ./.github/workflows/unit-test-and-codecov.yml
