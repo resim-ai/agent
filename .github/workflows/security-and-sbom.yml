@@ -27,9 +27,6 @@ concurrency:
   group: sec
   cancel-in-progress: true
 
-env:
-  TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db:2
-
 jobs:
   sbom:
     name: Scan
@@ -41,54 +38,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Run Trivy in GitHub SBOM mode and submit results to Dependency Graph
-        uses: aquasecurity/trivy-action@0.20.0
-        with:
-          scan-type: fs
-          format: github
-          output: dependency-results.sbom.json
-          image-ref: .
-          github-pat: ${{ secrets.github-token }}
-          scanners: vuln,license
-
-      - name: Upload trivy report as a Github artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: trivy-sbom-report
-          path: ${{ github.workspace }}/dependency-results.sbom.json
-          retention-days: 90
-
-      - name: Run Trivy vulnerability scanner in repo mode
-        uses: aquasecurity/trivy-action@0.20.0
-        with:
-          scan-type: fs
-          ignore-unfixed: true
-          format: table
-          severity: ${{ inputs.severity }}
-          output: vuln.output
-        continue-on-error: true
-
-      - name: Get scan output
-        id: scan-output
-        if: always()
-        run: |
-          {
-            echo 'body<<EOF'
-            awk 1 ORS='\n' < vuln.output
-            echo EOF
-          } > "$GITHUB_OUTPUT"
-
-      - name: Generate scan message
-        id: scan-message
-        env:
-          RESULT: ${{ steps.scan-output.outputs.body }}
-        run: |
-          if [ "$RESULT" = "" ]; then
-                    echo "message=:tada: No vulnerabilities found!" >>"$GITHUB_OUTPUT"
-          else
-                    echo "message=:warning: Vulnerabilites found!" >>"$GITHUB_OUTPUT"
-          fi
 
   deployment_bot_comment:
     name: Deployment Bot Comment
