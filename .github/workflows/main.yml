@@ -1,10 +1,10 @@
 ---
 name: Main Workflow
-on:  #trunk-ignore(yamllint/truthy)
+on:
   push:
     branches:
       - main
-  pull_request:  # trunk-ignore(yamllint/empty-values)
+  pull_request:
 
 concurrency:
   group: ${{ github.ref }}-main
@@ -17,19 +17,23 @@ permissions:
   pull-requests: write
 
 jobs:
-  lint:
-    name: Lint
+  golangci-lint:
+    name: GolangCI Lint
     runs-on: ubuntu-latest
-    permissions:
-      checks: write  # For trunk to post annotations
-      contents: read
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Trunk install
-        uses: trunk-io/trunk-action/install@v1
-      - name: Trunk Check
-        uses: trunk-io/trunk-action@v1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
+        with:
+          go-version-file: go.mod
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9
+        with:
+          version: v2.11
+          args: --timeout=15m --config=./.golangci.yml
+          verify: false
+          working-directory: .
 
   sbom:
     name: Security Scan and SBOM Generation

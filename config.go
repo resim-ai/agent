@@ -168,7 +168,7 @@ func (a *Agent) LoadConfig() error {
 	}
 	a.PoolLabels = viper.GetStringSlice(PoolLabelsKey)
 
-	//Parse mounts
+	// Parse mounts
 	if viper.IsSet(VolumeMountsKey) {
 		mountsString := viper.GetStringSlice(VolumeMountsKey)
 		for _, mount := range mountsString {
@@ -277,7 +277,7 @@ func (a *Agent) InitializeLogging() error {
 	}
 
 	// test write to check permissions on the file
-	_, err := logFileWriter.Write([]byte(fmt.Sprintf("ReSim Agent %v", agentVersion)))
+	_, err := fmt.Fprintf(logFileWriter, "ReSim Agent %v", agentVersion)
 	if err != nil {
 		return err
 	}
