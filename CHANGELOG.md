@@ -1,8 +1,13 @@
 <!-- markdownlint-disable MD041 -->
 
-# Changelog
+# Changelog
 
 Changes and release notes for the ReSim agent
+
+## v1.1.1 - 2026-03-25
+
+- Updates Go version and dependencies
+- Switches from Trivy to Anchore for scanning and SBOM
 
 ## v1.1.0 - 2025-12-01
 

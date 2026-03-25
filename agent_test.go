@@ -107,7 +107,7 @@ func (s *AgentTestSuite) createConfigFile() string {
 		log.Fatal("error creating temp file")
 	}
 
-	f.WriteString(fmt.Sprintf(defaultTestConfig, s.agent.Name))
+	fmt.Fprintf(f, defaultTestConfig, s.agent.Name)
 
 	s.configDir = t
 	return t
@@ -407,7 +407,6 @@ func (s *AgentTestSuite) TestStart_MissingWorkerEnvironmentVariables() {
 }
 
 func (s *AgentTestSuite) TestStart_MissingAuthToken() {
-
 	s.agent.ConfigDirOverride = s.createConfigFile()
 
 	err := s.agent.LoadConfig()
@@ -550,7 +549,6 @@ func (s *AgentTestSuite) setupMockAuthServer() *httptest.Server {
 		if got, want := r.FormValue("grant_type"), "http://auth0.com/oauth/grant-type/password-realm"; got != want {
 			s.FailNow("grant_type didn't match")
 		}
-
 	}))
 	os.Setenv("RESIM_AGENT_AUTH_HOST", s.mockAuthServer.URL)
 	s.agent.AuthHost = s.mockAuthServer.URL

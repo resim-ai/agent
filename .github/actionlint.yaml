@@ -1,0 +1,10 @@
+# GitHub Actions actionlint config https://github.com/rhysd/actionlint/blob/v1.7.7/docs/config.md
+# Configuration related to self-hosted runner.
+self-hosted-runner:
+  # Labels of self-hosted runner in array of strings.
+  labels:
+    - go-go-gadget-runner
+    - gha-small
+    - gha-medium
+    - gha-large
+    - gha-xlarge
