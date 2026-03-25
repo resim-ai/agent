@@ -29,7 +29,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const agentVersion = "v1.1.0"
+const agentVersion = "v1.1.1"
 
 type agentStatus string
 
@@ -453,7 +453,6 @@ func (a *Agent) runWorker(ctx context.Context, imageURI string, workerEnvVars []
 				slog.Info("Worker succeeded")
 			} else {
 				slog.Info("Worker container exited non-zero", "exit_code", status.State.ExitCode, "err", status.State.Error)
-
 			}
 			time.Sleep(a.WorkerExitSleep)
 			break
@@ -477,6 +476,7 @@ func (a *Agent) removeContainer(ctx context.Context, containerID string) {
 		slog.WarnContext(ctx, "error removing container", "error", err)
 	}
 }
+
 func Ptr[T any](t T) *T {
 	return &t
 }
