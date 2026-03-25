@@ -4,7 +4,7 @@
 # NOTE: More info can be found here: https://docs.docker.com/build/guide/multi-stage/
 # NOTE: See https://github.com/reproducible-containers/buildkit-cache-dance
 
-ARG GO_VERSION=1.23.1
+ARG GO_VERSION=1.26.1
 
 # Base container to cache go.mod dependencies
 FROM public.ecr.aws/docker/library/golang:${GO_VERSION} AS base
