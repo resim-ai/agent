@@ -114,6 +114,10 @@ func ListExpectedOutputFiles(realMetrics bool) []string {
 		"test_config.json",
 		TestReRunFile,
 		TestEmissionsFile,
+		"chart.png",
+		"plot.png",
+		"nested-stack.log",
+		"test-stack.log",
 	}
 
 	if realMetrics {
