@@ -40,5 +40,15 @@
   "sandbox": {
     "enabled": true,
     "autoAllowBashIfSandboxed": true
-  }
+  },
+  "extraKnownMarketplaces": {
+    "resim-tools": {
+      "source": {
+        "source": "github",
+        "repo": "resim-ai/workspace",
+        "ref": "v0.1.0"
+      }
+    }
+  },
+  "enabledPlugins": { "resim-shared@resim-tools": true }
 }
