@@ -29,7 +29,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const agentVersion = "v1.1.1"
+const agentVersion = "v1.2.0"
 
 type agentStatus string
 
@@ -62,6 +62,11 @@ type Agent struct {
 	getAWSConfigDirFunc    func() (string, bool)
 	ImageMutex             sync.RWMutex
 	WorkerImageURI         string
+	// PauseMutex guards paused. The main loop owns pause transitions (and
+	// their logging); the heartbeat goroutine only reads paused to echo the
+	// quiesced ack, mirroring how ImageMutex guards WorkerImageURI.
+	PauseMutex             sync.RWMutex
+	paused                 bool
 	CurrentErrorCount      int
 	MaxErrorCount          int
 	AgentErrorSleep        time.Duration // When the agent encounters an error, it will sleep for this duration before retrying
@@ -177,6 +182,20 @@ func (a *Agent) Start() error {
 			err = errors.Wrap(err, fmt.Sprintf("error checking in (attempt %d)", a.CurrentErrorCount))
 			a.CurrentErrorCount++
 			time.Sleep(a.AgentErrorSleep)
+			continue
+		}
+		// Honor a remote pause: a paused agent launches no workers. A paused
+		// checkin is a SUCCESSFUL checkin, so reset the error counter — a
+		// multi-hour pause must never trip the max-error process exit (which
+		// otherwise resets only after a successful worker run) — then sleep and
+		// re-checkin until unpaused. Any in-flight worker was already evicted
+		// via the heartbeat 410, so nothing is running here. This is placed
+		// before the response-field validation because only the paused boolean
+		// is load-bearing; in one-task mode the agent stays alive here and runs
+		// its single task once unpaused.
+		if a.updatePauseState(startup) {
+			a.CurrentErrorCount = 0
+			time.Sleep(a.WorkerExitSleep)
 			continue
 		}
 		if startup.WorkerImageURI == nil {
@@ -306,10 +325,19 @@ func (a *Agent) GetConfigDir() (string, error) {
 func (a *Agent) checkin() (api.AgentCheckinOutput, error) {
 	ctx := context.Background()
 
+	// Echo the level-triggered quiesced ack: paused is true only while the main
+	// loop is in the paused sleep state, at which point no worker is running by
+	// construction (runWorker blocks the loop). A heartbeat checkin made during
+	// a worker run therefore always reports false.
+	a.PauseMutex.RLock()
+	paused := a.paused
+	a.PauseMutex.RUnlock()
+
 	pollResponse, err := a.APIClient.AgentCheckinWithResponse(ctx, api.AgentCheckinInput{
 		AgentID:      &a.Name,
 		AgentVersion: Ptr(agentVersion),
 		PoolLabels:   &a.PoolLabels,
+		Paused:       Ptr(paused),
 	})
 	if err != nil {
 		slog.Error("Error checking in", "err", err)
@@ -328,6 +356,37 @@ func (a *Agent) checkin() (api.AgentCheckinOutput, error) {
 	}
 	// TODO: handle forced agent update
 	return *pollResponse.JSON200, nil
+}
+
+// updatePauseState reconciles the pause state reported by a checkin with the
+// agent's own, logging the pause and unpause transitions exactly once. It is
+// main-loop-only: the heartbeat goroutine must not call it, or transitions
+// would double-log and race. Only the boolean is load-bearing; the metadata
+// is best-effort for the host operator's logs. Returns whether the agent is
+// now paused.
+func (a *Agent) updatePauseState(checkin api.AgentCheckinOutput) bool {
+	paused := checkin.Paused != nil && *checkin.Paused
+
+	a.PauseMutex.Lock()
+	defer a.PauseMutex.Unlock()
+	switch {
+	case paused && !a.paused:
+		attrs := []any{}
+		if checkin.PausedAt != nil {
+			attrs = append(attrs, "paused_at", *checkin.PausedAt)
+		}
+		if checkin.PauseReason != nil {
+			attrs = append(attrs, "reason", *checkin.PauseReason)
+		}
+		if checkin.PausedBy != nil {
+			attrs = append(attrs, "paused_by", *checkin.PausedBy)
+		}
+		slog.Info("Agent paused; not launching workers until unpaused", attrs...)
+	case !paused && a.paused:
+		slog.Info("Agent unpaused; resuming normal operation")
+	}
+	a.paused = paused
+	return paused
 }
 
 func StringifyEnvironmentVariables(inputVars [][]string) []string {

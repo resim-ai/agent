@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/oapi-codegen/runtime"
 )
@@ -43,12 +44,17 @@ const (
 type AgentCheckinInput struct {
 	AgentID      *string      `json:"agentID,omitempty"`
 	AgentVersion *string      `json:"agentVersion,omitempty"`
+	Paused       *bool        `json:"paused,omitempty"`
 	PoolLabels   *[]PoolLabel `json:"poolLabels,omitempty"`
 }
 
 // AgentCheckinOutput defines model for agentCheckinOutput.
 type AgentCheckinOutput struct {
 	AuthToken                  *string                `json:"authToken,omitempty"`
+	PauseReason                *string                `json:"pauseReason,omitempty"`
+	Paused                     *bool                  `json:"paused,omitempty"`
+	PausedAt                   *time.Time             `json:"pausedAt,omitempty"`
+	PausedBy                   *string                `json:"pausedBy,omitempty"`
 	RequiredAgentVersion       *string                `json:"requiredAgentVersion,omitempty"`
 	WorkerEnvironmentVariables *[]EnvironmentVariable `json:"workerEnvironmentVariables,omitempty"`
 	WorkerImageURI             *string                `json:"workerImageURI,omitempty"`
