@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
@@ -575,10 +574,10 @@ func (s *AgentTestSuite) setupMockAPIServer() *httptest.Server {
 	return s.mockAPIServer
 }
 
-func createTestContainer(status string, running bool) types.ContainerJSON {
-	return types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
-			State: &types.ContainerState{
+func createTestContainer(status container.ContainerState, running bool) container.InspectResponse {
+	return container.InspectResponse{
+		ContainerJSONBase: &container.ContainerJSONBase{
+			State: &container.State{
 				Status:  status,
 				Running: running,
 			},

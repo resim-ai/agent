@@ -416,7 +416,10 @@ func (s *AgentTestSuite) GenerateAndUploadExperienceData(ctx context.Context, ex
 		slog.ErrorContext(ctx, "failed to load aws configuration", "error", err)
 		os.Exit(1)
 	}
-	uploader := manager.NewUploader(s3.NewFromConfig(cfg))
+	// feature/s3/manager is deprecated in favour of feature/s3/transfermanager, but that
+	// module is still pre-1.0 (v0.3.x) and has a different API. Staying on manager until it
+	// stabilises; see https://github.com/aws/aws-sdk-go-v2/discussions/3306
+	uploader := manager.NewUploader(s3.NewFromConfig(cfg)) //nolint:staticcheck // SA1019
 
 	data := []byte(experienceName)
 	base64Name := Base64EncodeString(experienceName)
@@ -430,7 +433,7 @@ func (s *AgentTestSuite) GenerateAndUploadExperienceData(ctx context.Context, ex
 
 func UploadFile(
 	ctx context.Context,
-	uploader *manager.Uploader,
+	uploader *manager.Uploader, //nolint:staticcheck // SA1019: see note in GenerateAndUploadExperienceData
 	filename string,
 	locationURL *url.URL,
 	data []byte,
@@ -442,7 +445,7 @@ func UploadFile(
 		filename,
 	) // path starts with a leading /, which is bad
 	slog.Info(fmt.Sprintf("Uploading to s3://%v/%v\n", bucket, key))
-	_, err := uploader.Upload(ctx, &s3.PutObjectInput{
+	_, err := uploader.Upload(ctx, &s3.PutObjectInput{ //nolint:staticcheck // SA1019: see note in GenerateAndUploadExperienceData
 		Bucket: &bucket,
 		Key:    &key,
 		Body:   bytes.NewReader(data),

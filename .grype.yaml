@@ -1,0 +1,51 @@
+# Grype configuration for the vulnerability scan in
+# .github/workflows/security-and-sbom.yml.
+#
+# The workflow does not set the scan-action `config` input, so this file is
+# auto-detected from the repo root.
+#
+# See https://github.com/resim-ai/rerun/blob/main/docs/handling-vulnerabilities.md
+#
+# ---------------------------------------------------------------------------
+# Accepted risk: daemon-side Moby/Docker advisories
+# ---------------------------------------------------------------------------
+# The agent imports github.com/docker/docker purely as a *client* SDK
+# (api/types/... and client) to talk to a Docker daemon on the host. It does
+# not build, embed, or run dockerd. Every advisory below is a vulnerability in
+# the daemon (authorization middleware, the container archive/cp endpoints,
+# plugin privilege validation) and none of the affected code is linked into
+# the agent binary.
+#
+# These are also unfixable from here: github.com/docker/docker is end-of-life
+# as a Go module at v28.5.2 (the version we pin). Upstream fixes ship in
+# github.com/moby/moby/v2, which is the *daemon* module and has no client
+# package; the successor client is github.com/moby/moby/client, a separate
+# pre-1.0 module with an incompatible API. Mitigation for all of these is
+# patching the Docker daemon on the host, not bumping this Go dependency.
+#
+# Only the entry below is ignored, because it is the only one that reports a
+# fix version and therefore the only one that survives the workflow's
+# `only-fixed: true` filter. The remaining daemon-side advisories are listed
+# here for the record but deliberately NOT ignored, so that they surface as
+# soon as upstream publishes a fix for them:
+#
+#   GHSA-x86f-5xw2-fm2r  CVE-2026-41567  High    PUT /containers/{id}/archive
+#                                                executes container binary on host
+#   GHSA-rg2x-37c3-w2rh  CVE-2026-42306  High    docker cp race -> bind mount
+#                                                redirection to host path
+#   GHSA-vp62-88p7-qqf5  CVE-2026-41568  Medium  docker cp race -> arbitrary empty
+#                                                file creation via symlink swap
+#   GHSA-pxq6-2prw-chj9  CVE-2026-33997  Medium  off-by-one in plugin privilege
+#                                                validation
+#
+# Revisit this file whenever github.com/docker/docker is upgraded or the agent
+# migrates to github.com/moby/moby/client.
+ignore:
+  # GHSA-x744-4wpc-v9h2 / CVE-2026-34040 — AuthZ plugin bypass with oversized
+  # request body. Daemon-side: the bypass is in dockerd's authorization
+  # middleware, which this agent never runs. Reported as fixed in 29.3.1, a
+  # version that does not exist under the github.com/docker/docker module path.
+  - vulnerability: GHSA-x744-4wpc-v9h2
+    package:
+      name: github.com/docker/docker
+      type: go-module
