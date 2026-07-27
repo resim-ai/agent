@@ -59,9 +59,9 @@ type Agent struct {
 	HostAWSConfigExists  bool
 	CustomerWorkerConfig CustomWorkerConfig
 	// For testing purposes - allows mocking the AWS config directory lookup
-	getAWSConfigDirFunc    func() (string, bool)
-	ImageMutex             sync.RWMutex
-	WorkerImageURI         string
+	getAWSConfigDirFunc func() (string, bool)
+	ImageMutex          sync.RWMutex
+	WorkerImageURI      string
 	// PauseMutex guards paused. The main loop owns pause transitions (and
 	// their logging); the heartbeat goroutine only reads paused to echo the
 	// quiesced ack, mirroring how ImageMutex guards WorkerImageURI.
