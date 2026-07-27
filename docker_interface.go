@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
@@ -17,7 +16,7 @@ type DockerClient interface {
 	Close() error
 	ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *ocispec.Platform, containerName string) (container.CreateResponse, error)
 	ContainerStart(ctx context.Context, containerID string, options container.StartOptions) error
-	ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error)
+	ContainerInspect(ctx context.Context, containerID string) (container.InspectResponse, error)
 	ContainerRemove(ctx context.Context, containerID string, options container.RemoveOptions) error
 }
 
@@ -40,9 +39,9 @@ func (m *MockDockerClient) ContainerCreate(ctx context.Context, config *containe
 	return args.Get(0).(container.CreateResponse), args.Error(1)
 }
 
-func (m *MockDockerClient) ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error) {
+func (m *MockDockerClient) ContainerInspect(ctx context.Context, containerID string) (container.InspectResponse, error) {
 	args := m.Called(ctx, containerID)
-	return args.Get(0).(types.ContainerJSON), args.Error(1)
+	return args.Get(0).(container.InspectResponse), args.Error(1)
 }
 
 func (m *MockDockerClient) ContainerStart(ctx context.Context, containerID string, options container.StartOptions) error {
