@@ -116,6 +116,9 @@ func ListExpectedOutputFiles(realMetrics bool) []string {
 		TestEmissionsFile,
 		"chart.png",
 		"plot.png",
+		"plots.zip",
+		"referenced_plot.png",
+		"test_snapshot.jpeg",
 		"nested-stack.log",
 		"test-stack.log",
 	}
