@@ -4,6 +4,10 @@
 
 Changes and release notes for the ReSim agent
 
+## v1.2.0 - 2026-07-28
+
+- Supports "pause" functionality driven from ReSim - a paused agent will not pick up new work until it is unpaused.
+
 ## v1.1.1 - 2026-03-25
 
 - Updates Go version and dependencies
