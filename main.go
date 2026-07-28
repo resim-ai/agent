@@ -15,12 +15,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/mount"
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
-	"github.com/google/uuid"
-	"github.com/lestrrat-go/jwx/v2/jwt"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/resim-ai/agent/api"
@@ -80,7 +80,7 @@ type Agent struct {
 }
 
 func main() {
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
+	dockerClient, err := client.New(client.FromEnv)
 	if err != nil {
 		slog.Error("error initializing Docker client", "err", err)
 		os.Exit(1)

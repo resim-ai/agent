@@ -125,9 +125,9 @@ func (s *AgentTestSuite) TestAgentWithLocalExperience() {
 			},
 		)
 		s.NoError(err)
-		s.Len(*listLogsResponse.JSON200.Logs, len(expectedOutputFiles))
+		s.Len(len(expectedOutputFiles), len(*listLogsResponse.JSON200.Logs))
 		for _, log := range *listLogsResponse.JSON200.Logs {
-			s.Contains(expectedOutputFiles, *log.FileName)
+			s.Contains(expectedOutputFiles, *log.FileName, "Log file %v present but not expected.", *log.FileName)
 			if printLogs {
 				fmt.Printf(">> Log: %v , Presigned URL: %v \n", *log.FileName, *log.LogOutputLocation)
 			}
