@@ -15,11 +15,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/client"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 	"github.com/google/uuid"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -289,8 +288,8 @@ func (a *Agent) maybePullImage(ctx context.Context, oldImage string) (string, er
 	}
 
 	slog.Info("Pulling image", "image", a.WorkerImageURI)
-	r, err := a.Docker.ImagePull(ctx, a.WorkerImageURI, image.PullOptions{
-		Platform: "linux/amd64",
+	r, err := a.Docker.ImagePull(ctx, a.WorkerImageURI, client.ImagePullOptions{
+		Platforms: []v1.Platform{{OS: "linux", Architecture: "amd64"}},
 	})
 	if err != nil {
 		return oldImage, err
@@ -482,11 +481,13 @@ func (a *Agent) runWorker(ctx context.Context, imageURI string, workerEnvVars []
 
 	res, err := a.Docker.ContainerCreate(
 		context.TODO(),
-		config,
-		hostConfig,
-		&network.NetworkingConfig{},
-		&v1.Platform{},
-		fmt.Sprintf("worker-%s", a.currentWorkerID),
+		client.ContainerCreateOptions{
+			Config:           config,
+			HostConfig:       hostConfig,
+			NetworkingConfig: &network.NetworkingConfig{},
+			Platform:         &v1.Platform{},
+			Name:             fmt.Sprintf("worker-%s", a.currentWorkerID),
+		},
 	)
 	if err != nil {
 		// Try to remove container and volumes if there is an error:
@@ -494,7 +495,7 @@ func (a *Agent) runWorker(ctx context.Context, imageURI string, workerEnvVars []
 		return errors.Wrap(err, "error creating container for worker")
 	}
 
-	err = a.Docker.ContainerStart(ctx, res.ID, container.StartOptions{})
+	_, err = a.Docker.ContainerStart(ctx, res.ID, client.ContainerStartOptions{})
 	if err != nil {
 		// Try to remove container and volumes if there is an error:
 		a.removeContainer(ctx, res.ID)
@@ -503,15 +504,15 @@ func (a *Agent) runWorker(ctx context.Context, imageURI string, workerEnvVars []
 	slog.Info("Container for worker starting", "worker", a.currentWorkerID)
 	// From now one, the worker is responsible for updating its own status.
 	for {
-		status, err := a.Docker.ContainerInspect(ctx, res.ID)
+		status, err := a.Docker.ContainerInspect(ctx, res.ID, client.ContainerInspectOptions{})
 		if err != nil {
 			return errors.Wrap(err, "error inspecting container for worker")
 		}
-		if status.State.Status != "running" {
-			if status.State.ExitCode == 0 {
+		if status.Container.State.Status != "running" {
+			if status.Container.State.ExitCode == 0 {
 				slog.Info("Worker succeeded")
 			} else {
-				slog.Info("Worker container exited non-zero", "exit_code", status.State.ExitCode, "err", status.State.Error)
+				slog.Info("Worker container exited non-zero", "exit_code", status.Container.State.ExitCode, "err", status.Container.State.Error)
 			}
 			time.Sleep(a.WorkerExitSleep)
 			break
@@ -528,7 +529,7 @@ func (a *Agent) runWorker(ctx context.Context, imageURI string, workerEnvVars []
 }
 
 func (a *Agent) removeContainer(ctx context.Context, containerID string) {
-	err := a.Docker.ContainerRemove(ctx, containerID, container.RemoveOptions{
+	_, err := a.Docker.ContainerRemove(ctx, containerID, client.ContainerRemoveOptions{
 		RemoveVolumes: true,
 	})
 	if err != nil {

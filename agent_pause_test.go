@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/docker/docker/api/types/container"
+	"github.com/moby/moby/client"
 	api "github.com/resim-ai/agent/api"
 	"github.com/stretchr/testify/mock"
 )
@@ -59,11 +59,11 @@ func (s *AgentTestSuite) expectSuccessfulWorkerRun() {
 		Return(io.NopCloser(strings.NewReader("thing")), nil).Once()
 	s.mockDocker.On("ContainerCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything,
 		mock.MatchedBy(func(workerID string) bool { return strings.HasPrefix(workerID, "worker-") }),
-	).Return(container.CreateResponse{ID: containerID}, nil).Once()
-	s.mockDocker.On("ContainerStart", mock.Anything, containerID, mock.Anything).Return(nil).Once()
+	).Return(client.ContainerCreateResult{ID: containerID}, nil).Once()
+	s.mockDocker.On("ContainerStart", mock.Anything, containerID, mock.Anything).Return(client.ContainerStartResult{}, nil).Once()
 	s.mockDocker.On("ContainerInspect", mock.Anything, containerID).Return(createTestContainer("running", true), nil).Once()
 	s.mockDocker.On("ContainerInspect", mock.Anything, containerID).Return(createTestContainer("succeeded", false), nil).Once()
-	s.mockDocker.On("ContainerRemove", mock.Anything, containerID, mock.Anything).Return(nil).Once()
+	s.mockDocker.On("ContainerRemove", mock.Anything, containerID, mock.Anything).Return(client.ContainerRemoveResult{}, nil).Once()
 }
 
 // TestStart_PausedThenUnpaused verifies a paused agent launches no worker while

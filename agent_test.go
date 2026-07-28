@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
 	"github.com/golang-jwt/jwt"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -199,7 +199,7 @@ func (s *AgentTestSuite) TestPrivilegedModeHostMode() {
 				workerDockerNetworkModeEnvVar = envVar
 			}
 		}
-	}).Return(container.CreateResponse{
+	}).Return(client.ContainerCreateResult{
 		ID: containerID,
 	}, nil).Once()
 
@@ -207,8 +207,8 @@ func (s *AgentTestSuite) TestPrivilegedModeHostMode() {
 		"ContainerStart",
 		mock.Anything,
 		containerID,
-		container.StartOptions{},
-	).Return(nil).Once()
+		client.ContainerStartOptions{},
+	).Return(client.ContainerStartResult{}, nil).Once()
 
 	runningContainer := createTestContainer("running", true)
 	s.mockDocker.On("ContainerInspect", mock.Anything, containerID).Return(runningContainer, nil).Once()
@@ -221,7 +221,7 @@ func (s *AgentTestSuite) TestPrivilegedModeHostMode() {
 		mock.Anything,
 		containerID,
 		mock.Anything,
-	).Return(nil).Once()
+	).Return(client.ContainerRemoveResult{}, nil).Once()
 
 	err = s.agent.Start()
 	s.NoError(err)
@@ -282,7 +282,7 @@ func (s *AgentTestSuite) TestDefaultAgentDockerModes() {
 				workerID = envVar
 			}
 		}
-	}).Return(container.CreateResponse{
+	}).Return(client.ContainerCreateResult{
 		ID: containerID,
 	}, nil).Once()
 
@@ -290,8 +290,8 @@ func (s *AgentTestSuite) TestDefaultAgentDockerModes() {
 		"ContainerStart",
 		mock.Anything,
 		containerID,
-		container.StartOptions{},
-	).Return(nil).Once()
+		client.ContainerStartOptions{},
+	).Return(client.ContainerStartResult{}, nil).Once()
 
 	runningContainer := createTestContainer("running", true)
 	s.mockDocker.On("ContainerInspect", mock.Anything, containerID).Return(runningContainer, nil).Once()
@@ -304,7 +304,7 @@ func (s *AgentTestSuite) TestDefaultAgentDockerModes() {
 		mock.Anything,
 		containerID,
 		mock.Anything,
-	).Return(nil).Once()
+	).Return(client.ContainerRemoveResult{}, nil).Once()
 
 	err = s.agent.Start()
 	s.NoError(err)
@@ -443,11 +443,11 @@ func (s *AgentTestSuite) TestStart_RunWorkerError() {
 
 	s.mockDocker.On("ImagePull", mock.Anything, mock.Anything, mock.Anything).Return(io.NopCloser(strings.NewReader("thing")), nil)
 
-	s.mockDocker.On("ContainerCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(container.CreateResponse{
+	s.mockDocker.On("ContainerCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(client.ContainerCreateResult{
 		ID: "container-id",
 	}, errors.New("containercreate error"))
 
-	s.mockDocker.On("ContainerRemove", mock.Anything, "container-id", mock.Anything).Return(nil)
+	s.mockDocker.On("ContainerRemove", mock.Anything, "container-id", mock.Anything).Return(client.ContainerRemoveResult{}, nil)
 
 	err = s.agent.Start()
 	s.ErrorContains(err, "error running ReSim worker (attempt 3)")
@@ -468,11 +468,11 @@ func (s *AgentTestSuite) TestStart_RunWorkerError_NoCleanup() {
 
 	s.mockDocker.On("ImagePull", mock.Anything, mock.Anything, mock.Anything).Return(io.NopCloser(strings.NewReader("thing")), nil)
 
-	s.mockDocker.On("ContainerCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(container.CreateResponse{
+	s.mockDocker.On("ContainerCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(client.ContainerCreateResult{
 		ID: "container-id",
 	}, errors.New("containercreate error"))
 
-	s.mockDocker.On("ContainerRemove", mock.Anything, "container-id", mock.Anything).Return(nil)
+	s.mockDocker.On("ContainerRemove", mock.Anything, "container-id", mock.Anything).Return(client.ContainerRemoveResult{}, nil)
 
 	err = s.agent.Start()
 	s.ErrorContains(err, "error running ReSim worker (attempt 3)")
@@ -575,11 +575,11 @@ func (s *AgentTestSuite) setupMockAPIServer() *httptest.Server {
 	return s.mockAPIServer
 }
 
-func createTestContainer(status string, running bool) types.ContainerJSON {
-	return types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
-			State: &types.ContainerState{
-				Status:  status,
+func createTestContainer(status string, running bool) client.ContainerInspectResult {
+	return client.ContainerInspectResult{
+		Container: container.InspectResponse{
+			State: &container.State{
+				Status:  container.ContainerState(status),
 				Running: running,
 			},
 		},
