@@ -15,13 +15,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/client"
 	"github.com/google/uuid"
 	"github.com/lestrrat-go/jwx/v2/jwt"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/resim-ai/agent/api"
@@ -29,7 +28,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const agentVersion = "v1.1.1"
+const agentVersion = "v1.2.0"
 
 type agentStatus string
 
@@ -59,9 +58,14 @@ type Agent struct {
 	HostAWSConfigExists  bool
 	CustomerWorkerConfig CustomWorkerConfig
 	// For testing purposes - allows mocking the AWS config directory lookup
-	getAWSConfigDirFunc    func() (string, bool)
-	ImageMutex             sync.RWMutex
-	WorkerImageURI         string
+	getAWSConfigDirFunc func() (string, bool)
+	ImageMutex          sync.RWMutex
+	WorkerImageURI      string
+	// PauseMutex guards paused. The main loop owns pause transitions (and
+	// their logging); the heartbeat goroutine only reads paused to echo the
+	// quiesced ack, mirroring how ImageMutex guards WorkerImageURI.
+	PauseMutex             sync.RWMutex
+	paused                 bool
 	CurrentErrorCount      int
 	MaxErrorCount          int
 	AgentErrorSleep        time.Duration // When the agent encounters an error, it will sleep for this duration before retrying
@@ -76,7 +80,7 @@ type Agent struct {
 }
 
 func main() {
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
+	dockerClient, err := client.New(client.FromEnv)
 	if err != nil {
 		slog.Error("error initializing Docker client", "err", err)
 		os.Exit(1)
@@ -179,6 +183,20 @@ func (a *Agent) Start() error {
 			time.Sleep(a.AgentErrorSleep)
 			continue
 		}
+		// Honor a remote pause: a paused agent launches no workers. A paused
+		// checkin is a SUCCESSFUL checkin, so reset the error counter — a
+		// multi-hour pause must never trip the max-error process exit (which
+		// otherwise resets only after a successful worker run) — then sleep and
+		// re-checkin until unpaused. Any in-flight worker was already evicted
+		// via the heartbeat 410, so nothing is running here. This is placed
+		// before the response-field validation because only the paused boolean
+		// is load-bearing; in one-task mode the agent stays alive here and runs
+		// its single task once unpaused.
+		if a.updatePauseState(startup) {
+			a.CurrentErrorCount = 0
+			time.Sleep(a.WorkerExitSleep)
+			continue
+		}
 		if startup.WorkerImageURI == nil {
 			slog.Info("Did not receive a worker image URI, sleeping for 60 seconds")
 			err = errors.New(fmt.Sprintf("no worker image URI (attempt %d)", a.CurrentErrorCount))
@@ -270,8 +288,8 @@ func (a *Agent) maybePullImage(ctx context.Context, oldImage string) (string, er
 	}
 
 	slog.Info("Pulling image", "image", a.WorkerImageURI)
-	r, err := a.Docker.ImagePull(ctx, a.WorkerImageURI, image.PullOptions{
-		Platform: "linux/amd64",
+	r, err := a.Docker.ImagePull(ctx, a.WorkerImageURI, client.ImagePullOptions{
+		Platforms: []v1.Platform{{OS: "linux", Architecture: "amd64"}},
 	})
 	if err != nil {
 		return oldImage, err
@@ -306,10 +324,19 @@ func (a *Agent) GetConfigDir() (string, error) {
 func (a *Agent) checkin() (api.AgentCheckinOutput, error) {
 	ctx := context.Background()
 
+	// Echo the level-triggered quiesced ack: paused is true only while the main
+	// loop is in the paused sleep state, at which point no worker is running by
+	// construction (runWorker blocks the loop). A heartbeat checkin made during
+	// a worker run therefore always reports false.
+	a.PauseMutex.RLock()
+	paused := a.paused
+	a.PauseMutex.RUnlock()
+
 	pollResponse, err := a.APIClient.AgentCheckinWithResponse(ctx, api.AgentCheckinInput{
 		AgentID:      &a.Name,
 		AgentVersion: Ptr(agentVersion),
 		PoolLabels:   &a.PoolLabels,
+		Paused:       Ptr(paused),
 	})
 	if err != nil {
 		slog.Error("Error checking in", "err", err)
@@ -328,6 +355,37 @@ func (a *Agent) checkin() (api.AgentCheckinOutput, error) {
 	}
 	// TODO: handle forced agent update
 	return *pollResponse.JSON200, nil
+}
+
+// updatePauseState reconciles the pause state reported by a checkin with the
+// agent's own, logging the pause and unpause transitions exactly once. It is
+// main-loop-only: the heartbeat goroutine must not call it, or transitions
+// would double-log and race. Only the boolean is load-bearing; the metadata
+// is best-effort for the host operator's logs. Returns whether the agent is
+// now paused.
+func (a *Agent) updatePauseState(checkin api.AgentCheckinOutput) bool {
+	paused := checkin.Paused != nil && *checkin.Paused
+
+	a.PauseMutex.Lock()
+	defer a.PauseMutex.Unlock()
+	switch {
+	case paused && !a.paused:
+		attrs := []any{}
+		if checkin.PausedAt != nil {
+			attrs = append(attrs, "paused_at", *checkin.PausedAt)
+		}
+		if checkin.PauseReason != nil {
+			attrs = append(attrs, "reason", *checkin.PauseReason)
+		}
+		if checkin.PausedBy != nil {
+			attrs = append(attrs, "paused_by", *checkin.PausedBy)
+		}
+		slog.Info("Agent paused; not launching workers until unpaused", attrs...)
+	case !paused && a.paused:
+		slog.Info("Agent unpaused; resuming normal operation")
+	}
+	a.paused = paused
+	return paused
 }
 
 func StringifyEnvironmentVariables(inputVars [][]string) []string {
@@ -423,11 +481,13 @@ func (a *Agent) runWorker(ctx context.Context, imageURI string, workerEnvVars []
 
 	res, err := a.Docker.ContainerCreate(
 		context.TODO(),
-		config,
-		hostConfig,
-		&network.NetworkingConfig{},
-		&v1.Platform{},
-		fmt.Sprintf("worker-%s", a.currentWorkerID),
+		client.ContainerCreateOptions{
+			Config:           config,
+			HostConfig:       hostConfig,
+			NetworkingConfig: &network.NetworkingConfig{},
+			Platform:         &v1.Platform{},
+			Name:             fmt.Sprintf("worker-%s", a.currentWorkerID),
+		},
 	)
 	if err != nil {
 		// Try to remove container and volumes if there is an error:
@@ -435,7 +495,7 @@ func (a *Agent) runWorker(ctx context.Context, imageURI string, workerEnvVars []
 		return errors.Wrap(err, "error creating container for worker")
 	}
 
-	err = a.Docker.ContainerStart(ctx, res.ID, container.StartOptions{})
+	_, err = a.Docker.ContainerStart(ctx, res.ID, client.ContainerStartOptions{})
 	if err != nil {
 		// Try to remove container and volumes if there is an error:
 		a.removeContainer(ctx, res.ID)
@@ -444,15 +504,15 @@ func (a *Agent) runWorker(ctx context.Context, imageURI string, workerEnvVars []
 	slog.Info("Container for worker starting", "worker", a.currentWorkerID)
 	// From now one, the worker is responsible for updating its own status.
 	for {
-		status, err := a.Docker.ContainerInspect(ctx, res.ID)
+		status, err := a.Docker.ContainerInspect(ctx, res.ID, client.ContainerInspectOptions{})
 		if err != nil {
 			return errors.Wrap(err, "error inspecting container for worker")
 		}
-		if status.State.Status != "running" {
-			if status.State.ExitCode == 0 {
+		if status.Container.State.Status != "running" {
+			if status.Container.State.ExitCode == 0 {
 				slog.Info("Worker succeeded")
 			} else {
-				slog.Info("Worker container exited non-zero", "exit_code", status.State.ExitCode, "err", status.State.Error)
+				slog.Info("Worker container exited non-zero", "exit_code", status.Container.State.ExitCode, "err", status.Container.State.Error)
 			}
 			time.Sleep(a.WorkerExitSleep)
 			break
@@ -469,7 +529,7 @@ func (a *Agent) runWorker(ctx context.Context, imageURI string, workerEnvVars []
 }
 
 func (a *Agent) removeContainer(ctx context.Context, containerID string) {
-	err := a.Docker.ContainerRemove(ctx, containerID, container.RemoveOptions{
+	_, err := a.Docker.ContainerRemove(ctx, containerID, client.ContainerRemoveOptions{
 		RemoveVolumes: true,
 	})
 	if err != nil {

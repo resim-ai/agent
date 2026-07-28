@@ -118,6 +118,9 @@ func ListExpectedOutputFiles(realMetrics bool) []string {
 		"plot.png",
 		"nested-stack.log",
 		"test-stack.log",
+		"plots.zip",
+		"referenced_plot.png",
+		"test_snapshot.jpeg",
 	}
 
 	if realMetrics {
