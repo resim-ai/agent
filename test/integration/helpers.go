@@ -104,9 +104,8 @@ func ListExpectedOutputFiles(realMetrics bool) []string {
 	expectedOutputFiles := []string{
 		TestMCAPFile,
 		TestMP4File,
-		"resource_metrics.binproto",
-		// Metrics 2.0 resource/test-length emissions (workers/docker_metrics.go
-		// in the rerun repo).
+		// Resource/test-length emissions (workers/docker_metrics.go in the
+		// rerun repo).
 		"resource_metrics.resim.jsonl",
 		"test_length_metric.resim.jsonl",
 		"experience-worker.log",
