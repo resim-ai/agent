@@ -112,6 +112,9 @@ func ListExpectedOutputFiles(realMetrics bool) []string {
 		"experience-container.log",
 		"metrics-worker.log",
 		"metrics-container.log",
+		// Each worker's inventory of the inputs it staged (workers/experience_input_files.go).
+		"experience-input_manifest.resim.json",
+		"metrics-input_manifest.resim.json",
 		ExpectedExperienceNameOutputFile,
 		ExpectedExperienceNameBase64File,
 		"test_config.json",
@@ -123,6 +126,8 @@ func ListExpectedOutputFiles(realMetrics bool) []string {
 		"test-stack.log",
 		"plots.zip",
 		"referenced_plot.png",
+		// Referenced by an artifact metric in the experience build's emissions file.
+		"test_artifact.txt",
 		"test_snapshot.jpeg",
 	}
 
