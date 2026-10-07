@@ -4,6 +4,10 @@
 
 Changes and release notes for the ReSim agent
 
+## v1.2.1 - 2026-10-07
+
+- Updates `golang.org/x/crypto` to v0.56.0, `golang.org/x/mod` to v0.40.0 and `github.com/labstack/echo/v4` to v4.15.3, which fix High-severity vulnerabilities.
+
 ## v1.2.0 - 2026-07-28
 
 - Supports "pause" functionality driven from ReSim - a paused agent will not pick up new work until it is unpaused.
