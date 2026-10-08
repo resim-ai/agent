@@ -27,18 +27,20 @@ on:
         required: true
         type: string
       comment_key:
-        description: Unique key to be combined with the 'ref_name' so we can identify the comment. E.g., if you're using this in a terraform flow, 'tf-', or if it's e2e tests, 'e2e-'. It doesn't need to be human readable as it's hidden and only used in the workflow code. There is a default set, but if you use this in multiple workflows on a PR, you need to set at least one.
+        description: Unique key to be combined with the 'ref_name' so we can identify the comment. E.g., if you're using this in a terraform flow, 'tf-', or if it's
+          e2e tests, 'e2e-'. It doesn't need to be human readable as it's hidden and only used in the workflow code. There is a default set, but if you use this in
+          multiple workflows on a PR, you need to set at least one.
         default: comment-
         required: false
         type: string
       comment_body:
-        description: The message you want be displayed in the PR comment. This can be a multiline string with MD formatting.
+        description: 'The message you want be displayed in the PR comment. This can be a multiline string with MD formatting. Callers written when this text went
+          into a JavaScript template literal escape newlines as `\n` and backticks as `\``. Those two escapes are expanded; everything else is used as written.'
         default: This PR will be tested and the results posted here.
         required: false
         type: string
 
 permissions:
-  id-token: write
   contents: read
   pull-requests: write
 
@@ -50,49 +52,45 @@ jobs:
       comment: ${{ steps.comment.outputs.result }}
     steps:
       - name: Generate Deployment Bot token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
         id: get_token
         with:
           app-id: ${{ secrets.DEPLOYMENT_BOT_APP_ID }}
           private-key: ${{ secrets.DEPLOYMENT_BOT_PRIVATE_KEY }}
           owner: ${{ inputs.repository_owner }}
-          repositories: ${{ inputs.repository}}
+          repositories: ${{ inputs.repository }}
+          permission-pull-requests: write
       - name: Comment on PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9
         id: comment
+        env:
+          REPOSITORY_OWNER: ${{ inputs.repository_owner }}
+          REPOSITORY: ${{ inputs.repository }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          COMMENT_REF: ${{ inputs.comment_key }}${{ inputs.ref_name }}
+          COMMENT_BODY: ${{ inputs.comment_body }}
         with:
           github-token: ${{ steps.get_token.outputs.token }}
           result-encoding: string
           script: |
-            const commentRef = '${{ inputs.comment_key }}${{ inputs.ref_name }}'
-            const body = `${{ inputs.comment_body }}\n<!--  ${commentRef} -->`
+            const { REPOSITORY_OWNER: owner, REPOSITORY: repo, PR_NUMBER, COMMENT_REF: commentRef } = process.env
+            if (!/^[0-9]+$/.test(PR_NUMBER)) {
+              throw new Error(`pr_number must be a number, got '${PR_NUMBER}'`)
+            }
+            const issue_number = Number(PR_NUMBER)
+            const message = process.env.COMMENT_BODY.replace(/\\([n`])/g, (_, c) => (c === 'n' ? '\n' : '`'))
+            const body = `${message}\n<!--  ${commentRef} -->`
 
             // Check for an existing comment
-            const { data: comments } = await github.rest.issues.listComments({
-              issue_number: '${{ inputs.pr_number }}',
-              owner: '${{ inputs.repository_owner }}',
-              repo: '${{ inputs.repository}}'
-            });
-
-            const foundComment = comments.find(comment => comment.body.includes(commentRef));
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 })
+            const foundComment = comments.find(comment => comment.body.includes(commentRef))
 
             if (foundComment) {
-              console.log(`Found existing comment, reusing.`);
-              github.rest.issues.updateComment({
-                comment_id: foundComment.id,
-                owner: '${{ inputs.repository_owner }}',
-                repo: '${{ inputs.repository}}',
-                body: body
-            })
-              return foundComment.id;
-            } else {
-              console.log(`Cannot find existing comment, creating a new one.`);
-              const response = await github.rest.issues.createComment({
-                issue_number: '${{ inputs.pr_number }}',
-                owner: '${{ inputs.repository_owner }}',
-                repo: '${{ inputs.repository}}',
-                body: body
-              });
-              return response.data.id;
+              console.log('Found existing comment, reusing.')
+              await github.rest.issues.updateComment({ owner, repo, comment_id: foundComment.id, body })
+              return foundComment.id
             }
+            console.log('Cannot find existing comment, creating a new one.')
+            const response = await github.rest.issues.createComment({ owner, repo, issue_number, body })
+            return response.data.id
     continue-on-error: true
