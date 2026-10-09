@@ -1,9 +1,40 @@
 {
   "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Read(**)",
+      "Glob",
+      "Grep",
+      "Task",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(rg:*)",
+      "Bash(grep:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(go build:*)",
+      "Bash(go test:*)",
+      "Bash(go vet:*)",
+      "Bash(go generate:*)",
+      "Bash(gofmt:*)",
+      "Bash(golangci-lint:*)",
+      "Bash(just:*)",
+      "Bash(git push:*)",
+      "Bash(gh pr create:*)"
+    ],
     "deny": [
       "Read(**/.env*)",
       "Read(**/*.pem)",
+      "Read(**/*credential*)",
+      "Read(**/*secret*)",
+      "Read(**/secrets/**)",
+      "Read(**/.resim/**)",
       "Bash(rm -rf:*)",
+      "Bash(git push --force:*)",
+      "Bash(gt:*)",
       "Bash(git reset --hard:*)",
       "Bash(terraform apply:*)",
       "Bash(terraform destroy:*)",
@@ -19,6 +50,10 @@
       "Bash(npm publish:*)",
       "Bash(packer build:*)"
     ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true
   },
   "env": {
     "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD": "1"

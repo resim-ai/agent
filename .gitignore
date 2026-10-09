@@ -33,3 +33,11 @@ test/integration/.terraform.lock.hcl
 .envrc
 .env
 /.DS_Store
+
+# secrets / env
+.env.*
+*.pem
+*.swp
+
+# Claude Code (machine-local, never committed)
+.claude/settings.local.json
