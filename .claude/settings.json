@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(**/.env*)",
+      "Read(**/*.pem)",
+      "Bash(rm -rf:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(terraform apply:*)",
+      "Bash(terraform destroy:*)",
+      "Bash(terraform import:*)",
+      "Bash(kubectl apply:*)",
+      "Bash(kubectl delete:*)",
+      "Bash(kubectl exec:*)",
+      "Bash(helm install:*)",
+      "Bash(helm upgrade:*)",
+      "Bash(helm uninstall:*)",
+      "Bash(docker push:*)",
+      "Bash(docker buildx bake --push:*)",
+      "Bash(npm publish:*)",
+      "Bash(packer build:*)"
+    ]
+  },
+  "env": {
+    "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD": "1"
+  },
+  "extraKnownMarketplaces": {
+    "resim-tools": {
+      "source": {
+        "source": "github",
+        "repo": "resim-ai/workspace"
+      },
+      "autoUpdate": true
+    }
+  },
+  "enabledPlugins": {
+    "resim-shared@resim-tools": true,
+    "signal-flag@resim-tools": true
+  }
+}
