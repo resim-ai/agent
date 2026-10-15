@@ -133,7 +133,7 @@ jobs:
       - name: Configure AWS Credentials us-east-1
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::909785973729:role/actions-agent
+          role-to-assume: arn:aws:iam::909785973729:role/actions-agent-pr
           aws-region: us-east-1
 
       - name: Login to ECR us-east-1
