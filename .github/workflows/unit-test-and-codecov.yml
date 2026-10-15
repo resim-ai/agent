@@ -23,6 +23,10 @@ jobs:
   build_and_test:
     name: Unit tests and Code coverage
     runs-on: ubuntu-latest
+    # Pull requests upload with actions-agent-pr, which may only write the pull
+    # request binaries. Pushes to main publish with actions-agent, which only
+    # trusts the publish environment, and publish accepts main only.
+    environment: ${{ github.event_name == 'push' && 'publish' || '' }}
     steps:
       - uses: actions/checkout@v4
       - name: Setup Go
@@ -63,7 +67,7 @@ jobs:
       - name: Configure AWS Credentials us-east-1
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::909785973729:role/actions-agent
+          role-to-assume: arn:aws:iam::909785973729:role/${{ github.event_name == 'pull_request' && 'actions-agent-pr' || 'actions-agent' }}
           aws-region: us-east-1
 
       - name: Upload binary to S3
