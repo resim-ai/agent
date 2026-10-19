@@ -27,7 +27,7 @@ go test . -v -race -run TestAgentSuite -testify.m TestMethodName
 
 ## PRs
 
-Uses **gh** — `git push` then `gh pr create`. This repo is Go but does **NOT** use Graphite; do not run `gt`.
+Uses **gh** — `git push` then `gh pr create`; a large change goes up as a GitHub stacked-PR chain (`gh stack`).
 
 Releases: push a `v*` tag to `main` (GitHub Actions builds and uploads binaries to Releases).
 
@@ -39,7 +39,6 @@ Releases: push a `v*` tag to `main` (GitHub Actions builds and uploads binaries 
 
 ## Gotchas
 
-- **gh, not Graphite** — never use `gt` here (see PRs above).
 - **`just generate` hits the network.** Codegen runs `oapi-codegen` against the live OpenAPI spec at `https://agentapi.resim.ai/agent/v1/openapi.yaml` (config in `api/client.cfg.yml`). Regenerate `api/client.gen.go` after any agent-API change; needs network access.
 - **`just lint` needs `golangci-lint`** installed locally (config in `.golangci.yml`); `just test_colour` needs `grc`.
 - **`just integration_test` is environment-gated** — expects AWS profile `rerun_dev`, an agent config with a unique `pool-labels`, and the `AGENT_TEST_*` env vars from `test/integration/README.md`. `TestDockerAgentWithS3Experience` also needs a dockerized agent running.
