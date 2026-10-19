@@ -34,7 +34,6 @@
       "Read(**/.resim/**)",
       "Bash(rm -rf:*)",
       "Bash(git push --force:*)",
-      "Bash(gt:*)",
       "Bash(git reset --hard:*)",
       "Bash(terraform apply:*)",
       "Bash(terraform destroy:*)",
