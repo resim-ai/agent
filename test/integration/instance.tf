@@ -189,8 +189,12 @@ data "aws_iam_policy_document" "this" {
 }
 
 resource "aws_iam_role" "this" {
-  name               = "agent-test-${terraform.workspace}"
-  assume_role_policy = <<EOF
+  name = "agent-test-${terraform.workspace}"
+  # actions-agent may only create roles with this boundary. It caps the role at what
+  # the test instance needs, whatever policies are attached. Defined in deployment's
+  # rerun/dev/base.
+  permissions_boundary = "arn:aws:iam::840213157818:policy/agent-integration-test-boundary"
+  assume_role_policy   = <<EOF
 {
  "Version": "2012-10-17",
  "Statement": [
