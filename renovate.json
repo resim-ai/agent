@@ -1,0 +1,154 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "schedule": [
+    "before 5am on monday"
+  ],
+  "minimumReleaseAge": "14 days",
+  "osvVulnerabilityAlerts": true,
+  "vulnerabilityAlerts": {
+    "description": "Security fixes open at any time, skip minimumReleaseAge (Renovate's default for vulnerability alerts) and are grouped into one PR per manager. `enabled: true` is copied onto each advisory's rule, which is what turns on indirect Go modules: the gomod manager disables them at extraction. groupSlug is set as well as groupName because the branch name comes from the slug, and the 0.x minor rule below sets its own groupSlug, which would otherwise pull a security fix into that rule's branch. separateMajorMinor is off so a major fix joins the same PR.",
+    "enabled": true,
+    "groupName": "vulnerable {{{manager}}} dependencies",
+    "groupSlug": "vulnerable-{{{manager}}}-dependencies",
+    "separateMajorMinor": false,
+    "schedule": [
+      "at any time"
+    ],
+    "prCreation": "immediate",
+    "labels": [
+      "security"
+    ],
+    "major": {
+      "enabled": true
+    }
+  },
+  "major": {
+    "enabled": false
+  },
+  "pre-commit": {
+    "enabled": true
+  },
+  "postUpdateOptions": [
+    "gomodTidy"
+  ],
+  "packageRules": [
+    {
+      "description": "Automerge minor and patch updates, security fixes included, once every check on the PR has passed. platformAutomerge is off so Renovate calls the merge API itself: GitHub's native auto-merge never uses a ruleset bypass, so it would wait for an approval. For these merges to go through, the approval rule on main must sit in a ruleset of its own that lists the resim-renovate app as a bypass actor; a bypass on the ruleset holding the required checks would exempt the app from those as well. ignoreTests stays off because the ruleset only requires Agent Integration Test; Renovate's own check is what stops a merge when lint, unit tests or the vulnerability scan fail.",
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "automerge": true,
+      "platformAutomerge": false
+    },
+    {
+      "description": "Automerge GitHub Actions digest updates, merged the same way as minor and patch updates.",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchUpdateTypes": [
+        "digest",
+        "pinDigest"
+      ],
+      "automerge": true,
+      "platformAutomerge": false
+    },
+    {
+      "description": "Group all GitHub Actions updates into a single PR.",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest",
+        "pinDigest"
+      ],
+      "groupName": "GHA minor and patch"
+    },
+    {
+      "description": "Group all gomod minor and patch updates into a single PR.",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "gomod minor and patch"
+    },
+    {
+      "description": "Group AWS SDK v2 updates.",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "github.com/aws/aws-sdk-go-v2",
+        "github.com/aws/aws-sdk-go-v2/**"
+      ],
+      "groupName": "aws-sdk-go-v2"
+    },
+    {
+      "description": "Group the moby API and client modules, which release together.",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "github.com/moby/moby/**"
+      ],
+      "groupName": "moby"
+    },
+    {
+      "description": "Move the golang base image and the go.mod `go` directive in the same PR. The official golang images set GOTOOLCHAIN=local, so a directive above the image's Go version makes every Go command in the image build refuse to run. minimumReleaseAge is off for the group because the image registry publishes no release timestamps: Renovate holds every image tag back as pending and would open the PR with only the directive bump, which is the break this group exists to prevent.",
+      "matchPackageNames": [
+        "public.ecr.aws/docker/library/golang",
+        "go",
+        "golang"
+      ],
+      "groupName": "go toolchain",
+      "minimumReleaseAge": "0 days"
+    },
+    {
+      "description": "Bump the go.mod `go` directive to each new Go release. Renovate otherwise reads it as a minimum version that every newer 1.x release satisfies, and never proposes an update. The release workflow installs an older Go from the GO_VERSION repository variable and switches up to the directive's version, so the directive decides which standard library the released binaries contain.",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchDepTypes": [
+        "golang"
+      ],
+      "rangeStrategy": "bump"
+    },
+    {
+      "description": "Group pre-commit hook updates.",
+      "matchManagers": [
+        "pre-commit"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest"
+      ],
+      "groupName": "pre-commit minor and patch"
+    },
+    {
+      "description": "A minor bump of a v0.x Go module may break its API, so these leave the shared gomod group and open one PR per source repository. A break then fails only its own PR, the rest still merge, and these still automerge if CI passes. golang.org/x and google.golang.org keep compatibility across 0.x minors in practice; moby has its own group. This rule must stay below the group rules it overrides.",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchUpdateTypes": [
+        "minor"
+      ],
+      "matchCurrentVersion": "/^v?0\\./",
+      "matchPackageNames": [
+        "!golang.org/x/**",
+        "!google.golang.org/**",
+        "!github.com/moby/moby/**"
+      ],
+      "groupName": "{{#if sourceRepo}}{{{sourceRepo}}}{{else}}{{{depName}}}{{/if}} 0.x minor",
+      "groupSlug": "{{#if sourceRepoSlug}}{{{sourceRepoSlug}}}{{else}}{{{depNameSanitized}}}{{/if}}-0.x-minor"
+    }
+  ]
+}
