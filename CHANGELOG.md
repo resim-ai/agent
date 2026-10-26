@@ -6,7 +6,8 @@ Changes and release notes for the ReSim agent
 
 ## v1.2.1 - 2026-10-07
 
-- Updates `golang.org/x/crypto` to v0.56.0, `golang.org/x/mod` to v0.40.0 and `github.com/labstack/echo/v4` to v4.15.3, which fix High-severity vulnerabilities.
+- Updates `golang.org/x/crypto` to v0.58.0 and `golang.org/x/mod` to v0.41.0, which fix High-severity vulnerabilities.
+- Updates `golang.org/x/net`, `github.com/getkin/kin-openapi` and `github.com/labstack/echo/v4` to clear Critical and High-severity findings in the repository's vulnerability scan. These modules are used only by tests and code generation, not by the agent binary.
 
 ## v1.2.0 - 2026-07-28
 
