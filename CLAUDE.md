@@ -56,13 +56,16 @@ Releases: push a `v*` tag to `main` (GitHub Actions builds and uploads binaries 
 - `Justfile` — task runner. `Dockerfile` — agent container image.
 
 <!-- resim-shared:begin writing-conventions (managed by the resim-shared plugin: edit defaults/claude-md/writing-conventions.md in resim-ai/workspace, then run bin/resim-sync --apply) -->
+
 ## Writing conventions
 
 Shared across ReSim repos. Each artifact has a different reader and a different lifetime, which is why the same context belongs in one of them and not the others. The `resim-shared` plugin carries the full policies (`resim-orient` → Code Comments, Never Post Comments Unsolicited) and `/comment-audit`, the sweep for a branch you iterated on.
 
 ### Code comments
 
-Default to no comments. Add one only when the WHY is non-obvious — a hidden constraint, a workaround for a specific bug, or a non-intuitive invariant a reader would otherwise miss.
+Preserve useful existing comments, including multi-line documentation. Run instructions, test purpose, template or generated-code maintenance requirements, external contracts and non-obvious constraints all earn their place. Keep new comments concise, with enough detail to be useful.
+
+Editing a file is not a reason to strip its comments. Remove comments only when they are stale, misleading, redundant, or merely narrate an edit. Correct outdated portions while retaining useful guidance; when uncertain, inspect the context and preserve the comment until there is a concrete reason to remove it.
 
 Comments must describe the code itself. Do **not** reference ephemeral context that belongs in the PR description:
 
@@ -70,7 +73,7 @@ Comments must describe the code itself. Do **not** reference ephemeral context t
 - Linear ticket IDs (`WOB-4129`, `RSC-1159`), other PRs in a stack, or follow-up work that will land later.
 - Measurements, timings and incident narration from the investigation that produced the change.
 - Environment variables cited for narration rather than mechanics (`from AGENT_LATEST_KNOWN_VERSION`).
-- "Used by X", "added for the Y flow", "handles the case from issue #123".
+- Change-history narration such as "added for the Y flow" or "handles the case from issue #123". Durable usage instructions and caller constraints are useful documentation.
 
 That context rots in code — PR descriptions are the right place for it. If a comment wouldn't make sense to a reader who has never seen the originating plan or PR, delete it.
 
@@ -80,11 +83,21 @@ Never leave a comment explaining the version you just replaced (`now uses X`, `n
 
 ### PR descriptions
 
-The PR description is the home for everything the other two exclude: how the problem was found, measurements and timings, affected resource names, ticket IDs, rollout and verification steps.
+Write for engineers and product owners who have not followed the conversation. Explain the feature, its purpose, and the decisions needed to review or roll it out. For a substantive change, aim for roughly **150–250 words**; simple changes can be shorter. This is a guide to useful depth, not a quota.
 
-For a stacked or multi-track change, open with a `## Stack position` block near the top — not buried — stating which track it is, what it depends on, what gates it at merge time, and what it unblocks downstream.
+Use this order, without requiring a heading for each part:
+
+1. **What changes and why:** open with one or two sentences naming the concrete capability or behavior and the problem it addresses. A short before/after example can help.
+2. **The important pieces:** explain two to four feature-level changes when there are distinct pieces to understand. Short bullets with descriptive labels work well; do not force a list for a simple change.
+3. **Why it matters:** connect those changes to the customer workflow or engineering capability they enable. Explain meaningful scope boundaries when they prevent a likely misunderstanding.
+4. **Dependencies and verification, when relevant:** explain any actual merge or activation prerequisite, why it exists, and what it unblocks. Briefly state meaningful validation and remaining gaps; distinguish completed checks from planned checks.
+
+Include technical terms only when they explain behavior, permissions, constraints, or a material tradeoff. Omit file/function inventories, implementation walkthroughs, commands and logs, investigation chronology, abandoned approaches, and conversational status updates. Do not include related-work lists or routine stack bookkeeping. Link another PR only when a reviewer needs it to understand an actual dependency; put that explanation after the feature summary, without a mandatory `Stack position` block or track number in the title.
+
+Ground every claim in the final diff and verified evidence. Rewrite the title and body when scope changes. Keep the title about the delivered capability. Before finishing, check that a reader can explain **what this delivers, why we need it, and what must happen before it is usable** without reading the conversation. Use the shared `pr-describer` agent's example as a guide to depth and tone.
 
 ### Changelog entries
 
 Changelog entries are for humans. State what changed and link the parent PR, plus the invariant or behaviour needed to make sense of it. Everything else belongs in the PR description. An entry is read later by someone deciding whether a version matters to them, not by someone reviewing the work.
+
 <!-- resim-shared:end writing-conventions -->
