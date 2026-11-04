@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/google/uuid"
 	"github.com/resim-ai/api-client/api"
@@ -427,13 +426,13 @@ func (s *AgentTestSuite) GenerateAndUploadExperienceData(ctx context.Context, ex
 		slog.ErrorContext(ctx, "failed to load aws configuration", "error", err)
 		os.Exit(1)
 	}
-	uploader := manager.NewUploader(s3.NewFromConfig(cfg))
+	client := s3.NewFromConfig(cfg)
 
 	data := []byte(experienceName)
 	base64Name := Base64EncodeString(experienceName)
 	// Upload the data to s3:
-	UploadFile(ctx, uploader, ExpectedExperienceNameFile, uploadLocation1, data)
-	UploadFile(ctx, uploader, ExpectedExperienceNameBase64File, uploadLocation2, base64Name)
+	UploadFile(ctx, client, ExpectedExperienceNameFile, uploadLocation1, data)
+	UploadFile(ctx, client, ExpectedExperienceNameBase64File, uploadLocation2, base64Name)
 	// Return the s3 paths to the experiences:
 	// One as a prefix, and one as a file name
 	return []string{experienceLocation1, fmt.Sprintf("%s%s", experienceLocation2, ExpectedExperienceNameBase64File)}
@@ -441,7 +440,7 @@ func (s *AgentTestSuite) GenerateAndUploadExperienceData(ctx context.Context, ex
 
 func UploadFile(
 	ctx context.Context,
-	uploader *manager.Uploader,
+	client *s3.Client,
 	filename string,
 	locationURL *url.URL,
 	data []byte,
@@ -453,7 +452,7 @@ func UploadFile(
 		filename,
 	) // path starts with a leading /, which is bad
 	slog.Info(fmt.Sprintf("Uploading to s3://%v/%v\n", bucket, key))
-	_, err := uploader.Upload(ctx, &s3.PutObjectInput{
+	_, err := client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: &bucket,
 		Key:    &key,
 		Body:   bytes.NewReader(data),
