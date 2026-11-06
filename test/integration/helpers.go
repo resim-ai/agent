@@ -264,10 +264,10 @@ func (s *AgentTestSuite) CreateTestSystem() {
 		BuildMemoryMib:             256,
 		BuildVcpus:                 1,
 		BuildSharedMemoryMb:        64,
-		MetricsBuildGpus:           0,
-		MetricsBuildMemoryMib:      256,
-		MetricsBuildVcpus:          1,
-		MetricsBuildSharedMemoryMb: 64,
+		MetricsBuildGpus:           Ptr(0),
+		MetricsBuildMemoryMib:      Ptr(256),
+		MetricsBuildVcpus:          Ptr(1),
+		MetricsBuildSharedMemoryMb: Ptr(64),
 	}
 	createSystemResponse, err := s.APIClient.CreateSystemWithResponse(
 		context.Background(),
