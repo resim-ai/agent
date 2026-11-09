@@ -17,20 +17,20 @@ repos:
       - id: go-mod-tidy
       - id: go-fmt
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 0.29.3
+    rev: 0.38.2
     hooks:
       - id: check-github-actions
       - id: check-github-workflows
   - repo: https://github.com/google/yamlfmt
-    rev: v0.13.0
+    rev: v0.21.0
     hooks:
       - id: yamlfmt
   - repo: https://github.com/adrienverge/yamllint.git
-    rev: v1.35.1
+    rev: v1.38.0
     hooks:
       - id: yamllint
         args: [--format, parsable, --strict, -c, .trunk/configs/.yamllint.yaml]
   - repo: https://github.com/hadolint/hadolint
-    rev: v2.13.0-beta
+    rev: v2.15.1
     hooks:
       - id: hadolint-docker
